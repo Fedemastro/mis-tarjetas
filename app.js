@@ -545,10 +545,12 @@ async function handleFile(inp) {
   if (pwd === null) { resetDropZone('Cancelado'); return; }
 
   try {
-    var pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    var pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+    if (!pdfjsLib) { throw new Error('pdf.js no cargado'); }
+    // Disable worker for CDN usage
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
-    var loadingTask = pdfjsLib.getDocument({ data: arrayBuf, password: pwd });
+    var loadingTask = pdfjsLib.getDocument({ data: arrayBuf, password: pwd, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
     var pdfDoc = await loadingTask.promise;
 
     // Render each page to canvas and collect image data
@@ -606,10 +608,15 @@ async function extractWithAI() {
     '  "minimo": numero en pesos,\n' +
     '  "total": numero en pesos,\n' +
     '  "totalUSD": numero en dolares (0 si no hay),\n' +
-    '  "ownExpenses": [{"desc":"nombre del comercio","amount":numero en pesos de la cuota o del consumo,"category":"una de: Supermercado/Restaurantes / Comida/Nafta / Transporte/Servicios/Salud/Ropa / Indumentaria/Entretenimiento/Viajes/Otros","date":"YYYY-MM-DD","cuotas":numero total de cuotas (null si no es en cuotas),"cuotaActual":numero de cuota actual (null si no es en cuotas)}],\n' +
-    '  "extensions": [{"holder":"nombre del titular de extension","total":numero,"items":[{"desc":"comercio","amount":numero,"cuotas":numero total o null,"cuotaActual":numero actual o null}]}]\n' +
+    '  "ownExpenses": [{"desc":"nombre del comercio","amount":numero del monto,"currency":"ARS o USD segun como aparece en el resumen","category":"una de: Supermercado/Restaurantes / Comida/Nafta / Transporte/Servicios/Salud/Ropa / Indumentaria/Entretenimiento/Viajes/Otros","date":"YYYY-MM-DD","cuotas":numero total de cuotas o null,"cuotaActual":numero de cuota actual o null}],\n' +
+    '  "extensions": [{"holder":"nombre del titular","total":numero en pesos,"totalUSD":numero en dolares o 0,"items":[{"desc":"comercio","amount":numero,"currency":"ARS o USD","cuotas":numero o null,"cuotaActual":numero o null}]}]\n' +
     '}\n' +
-    'IMPORTANTE: incluir TODOS los gastos sin excepcion, tanto propios como de extensiones. Para consumos en cuotas, el campo amount debe ser el monto de la cuota que aparece en este resumen. Ejemplo cuotas: "cuotaActual":3,"cuotas":12. Las extensiones tienen su propia seccion separada con el nombre del titular.';
+    'REGLAS CRITICAS:\n' +
+    '1. Incluir TODOS los gastos sin excepcion.\n' +
+    '2. El campo currency debe ser USD si el monto figura en dolares en el resumen (columna DOLARES o dice USD), ARS si figura en pesos.\n' +
+    '3. Para consumos en cuotas el amount es el monto de la cuota de este mes. Ejemplo: "cuotaActual":3,"cuotas":12.\n' +
+    '4. Las extensiones tienen su propia seccion separada identificada con el nombre del titular.\n' +
+    '5. Los intereses, impuestos y percepciones tambien deben incluirse como gastos con categoria Otros.';
 
   userContent.push({ type: 'text', text: prompt });
 
@@ -761,7 +768,8 @@ function renderHistorico() {
             var ei = extItems[m];
             var eiCuotas = (ei.cuotas && ei.cuotas > 1)
               ? ' <span class="badge blue" style="font-size:10px">' + (ei.cuotaActual || '?') + '/' + ei.cuotas + '</span>' : '';
-            extHtml += '<tr><td>' + (ei.desc || '-') + eiCuotas + '</td><td class="num" style="text-align:right">$' + fmt(ei.amount || 0) + '</td></tr>';
+            var eiCurr = (ei.currency === 'USD') ? 'U$S ' : '$';
+            extHtml += '<tr><td>' + (ei.desc || '-') + eiCuotas + '</td><td class="num" style="text-align:right">' + eiCurr + fmt(ei.amount || 0) + '</td></tr>';
           }
           extHtml += '</tbody></table>';
         }
