@@ -22,6 +22,7 @@ function saveLocal() { localStorage.setItem('tarjetas_db', JSON.stringify(db)); 
 function loadLocal() {
   const d = localStorage.getItem('tarjetas_db');
   if (d) { try { const p = JSON.parse(d); db = { ...db, ...p }; } catch {} }
+  if (!db.payments) db.payments = {};
 }
 function saveCfg() { localStorage.setItem('tarjetas_cfg', JSON.stringify(cfg)); }
 function loadCfg() {
@@ -257,12 +258,9 @@ function renderDashboard() {
         '<div style="background:var(--surface2);border-radius:6px;padding:8px 10px">' +
           '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Registrar pago</div>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
-            '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--text2)">Pesos $</label>' +
-            '<input type="number" id="pay-ars-' + s.id + '" placeholder="0" value="' + (payment.ars||'') + '" style="width:120px;font-size:12px;padding:5px 8px" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)"></div>' +
-            '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--text2)">Dólares U$S</label>' +
-            '<input type="number" id="pay-usd-' + s.id + '" placeholder="0" value="' + (payment.usd||'') + '" style="width:100px;font-size:12px;padding:5px 8px" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)"></div>' +
-            '<div style="display:flex;flex-direction:column;gap:2px;padding-top:14px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">' +
-            '<input type="checkbox" id="pay-full-' + s.id + '" data-sid="' + s.id + '" data-total="' + s.total + '" data-usd="' + (s.totalUSD||0) + '" ' + (payment.full?'checked':'') + ' onchange="toggleFullPayment(this.dataset.sid,this.dataset.total,this.dataset.usd)">Pago total</label></div>' +
+            '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--text2)">Pesos $</label><input type="number" id="pay-ars-' + s.id + '" placeholder="0" value="' + (payment.ars||'') + '" style="width:110px;font-size:12px;padding:5px 8px" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)"></div>' +
+            '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--text2)">Dólares U$S</label><input type="number" id="pay-usd-' + s.id + '" placeholder="0" value="' + (payment.usd||'') + '" style="width:90px;font-size:12px;padding:5px 8px" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)"></div>' +
+            '<div style="display:flex;flex-direction:column;gap:2px;padding-top:14px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer"><input type="checkbox" id="pay-full-' + s.id + '" data-sid="' + s.id + '" data-total="' + (s.total||0) + '" data-usd="' + (s.totalUSD||0) + '" ' + (payment.full?'checked':'') + ' onchange="toggleFullPayment(this.dataset.sid,this.dataset.total,this.dataset.usd)">Pago total</label></div>' +
             (payment.ars || payment.usd ? '<div style="padding-top:14px;font-size:11px;color:var(--green);font-weight:500">&#10003; Pagado</div>' : '') +
           '</div>' +
         '</div>' +
@@ -270,21 +268,37 @@ function renderDashboard() {
     }).join('');
   }
 
-  // Extensions
+  // Extensions — from summaries + from manual gastosTerceros
   var de = document.getElementById('dash-ext');
   var extData = {};
+  // From card summaries (extension sections)
   ms.forEach(function(s) {
     (s.extensions||[]).forEach(function(e) {
-      if (!extData[e.holder]) extData[e.holder] = 0;
-      extData[e.holder] += Number(e.total||0);
+      if (!extData[e.holder]) extData[e.holder] = { fromSummary: 0, fromManual: 0 };
+      extData[e.holder].fromSummary += Number(e.total||0);
     });
   });
+  // From manual gastosTerceros for this month
+  var ym2 = ym;
+  (db.gastosTerceros||[]).filter(function(g){ return g.month === ym2; }).forEach(function(g) {
+    if (!extData[g.holder]) extData[g.holder] = { fromSummary: 0, fromManual: 0 };
+    extData[g.holder].fromManual += Number(g.amount||0);
+  });
   var extKeys = Object.keys(extData);
+  var extBtn = document.getElementById('dash-ext-btn');
+  if (extBtn) extBtn.textContent = extKeys.length ? ('Mostrar (' + extKeys.length + ')') : 'Mostrar';
   if (!extKeys.length) {
     de.innerHTML = '<div class="empty">Sin extensiones este mes</div>';
   } else {
     de.innerHTML = extKeys.map(function(k) {
-      return '<div class="ext-row"><span style="font-weight:500">' + k + '</span><span class="badge blue" style="font-family:var(--mono)">$' + fmt(extData[k]) + '</span></div>';
+      var d = extData[k];
+      var total = d.fromSummary + d.fromManual;
+      var detail = [];
+      if (d.fromSummary > 0) detail.push('Resumen: $' + fmt(d.fromSummary));
+      if (d.fromManual > 0) detail.push('Manual: $' + fmt(d.fromManual));
+      return '<div class="ext-row"><div><span style="font-weight:500">' + k + '</span>' +
+        (detail.length > 1 ? '<div style="font-size:10px;color:var(--text2);margin-top:1px">' + detail.join(' &nbsp;+&nbsp; ') + '</div>' : '') +
+        '</div><span class="badge blue" style="font-family:var(--mono)">$' + fmt(total) + '</span></div>';
     }).join('');
   }
 
@@ -314,6 +328,18 @@ function renderDashboard() {
 
   renderNewExpenses(_newItems);
   updateNewToggleBtn();
+}
+
+function toggleDashExt() {
+  var el = document.getElementById('dash-ext');
+  var btn = document.getElementById('dash-ext-btn');
+  var col = document.getElementById('dash-two-col');
+  if (!el) return;
+  var visible = el.style.display !== 'none';
+  el.style.display = visible ? 'none' : 'block';
+  if (btn) btn.textContent = visible ? btn.textContent.replace('Ocultar','Mostrar') : 'Ocultar';
+  // Expand to two columns when extensions visible, single when hidden
+  if (col) col.style.gridTemplateColumns = visible ? '1fr' : '1fr 1fr';
 }
 
 function updateNewToggleBtn() {
@@ -768,22 +794,24 @@ async function extractWithAI() {
     userContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: uploadedFileData } });
   }
 
-  const prompt = 'Analiza este resumen de tarjeta de credito argentina. Extrae TODOS los gastos y responde SOLO con JSON valido, sin markdown ni backticks:\n' +
+  const prompt = 'Analiza este resumen de tarjeta de credito argentina. Extrae TODOS los movimientos y responde SOLO con JSON valido, sin markdown ni backticks:\n' +
     '{\n' +
     '  "cardName": "nombre de la tarjeta",\n' +
     '  "vencimiento": "YYYY-MM-DD",\n' +
-    '  "minimo": numero en pesos,\n' +
-    '  "total": numero en pesos,\n' +
-    '  "totalUSD": numero en dolares (0 si no hay),\n' +
-    '  "ownExpenses": [{"desc":"nombre del comercio","amount":numero del monto,"currency":"ARS o USD segun como aparece en el resumen","category":"una de: Supermercado/Restaurantes / Comida/Nafta / Transporte/Servicios/Salud/Ropa / Indumentaria/Entretenimiento/Viajes/Otros","date":"YYYY-MM-DD","cuotas":numero total de cuotas o null,"cuotaActual":numero de cuota actual o null}],\n' +
-    '  "extensions": [{"holder":"nombre del titular","total":numero en pesos,"totalUSD":numero en dolares o 0,"items":[{"desc":"comercio","amount":numero,"currency":"ARS o USD","cuotas":numero o null,"cuotaActual":numero o null}]}]\n' +
+    '  "minimo": numero positivo en pesos,\n' +
+    '  "total": numero positivo en pesos (saldo actual a pagar),\n' +
+    '  "totalUSD": numero positivo en dolares (0 si no hay),\n' +
+    '  "ownExpenses": [{"desc":"descripcion del movimiento","amount":numero,"isCredit":true/false,"currency":"ARS o USD","category":"una de: Supermercado/Restaurantes / Comida/Nafta / Transporte/Servicios/Salud/Ropa / Indumentaria/Entretenimiento/Viajes/Otros","date":"YYYY-MM-DD","cuotas":numero total o null,"cuotaActual":numero actual o null}],\n' +
+    '  "extensions": [{"holder":"nombre del titular","total":numero en pesos,"totalUSD":numero en dolares o 0,"items":[{"desc":"comercio","amount":numero,"isCredit":false,"currency":"ARS o USD","cuotas":numero o null,"cuotaActual":numero o null}]}]\n' +
     '}\n' +
     'REGLAS CRITICAS:\n' +
-    '1. Incluir TODOS los gastos sin excepcion.\n' +
-    '2. El campo currency debe ser USD si el monto figura en dolares en el resumen (columna DOLARES o dice USD), ARS si figura en pesos.\n' +
-    '3. Para consumos en cuotas el amount es el monto de la cuota de este mes. Ejemplo: "cuotaActual":3,"cuotas":12.\n' +
-    '4. Las extensiones tienen su propia seccion separada identificada con el nombre del titular.\n' +
-    '5. Los intereses, impuestos y percepciones tambien deben incluirse como gastos con categoria Otros.';
+    '1. Incluir TODOS los movimientos: consumos, pagos, intereses, impuestos, ajustes.\n' +
+    '2. El campo isCredit=true para pagos, devoluciones o cualquier movimiento que REDUCE el saldo (montos negativos en el resumen, filas que dicen SU PAGO, PAGO, CREDITO, DEVOLUCION). isCredit=false para consumos que AUMENTAN el saldo.\n' +
+    '3. El campo amount siempre es POSITIVO. Usar isCredit para indicar si es debito o credito.\n' +
+    '4. currency=USD si el monto figura en la columna DOLARES o dice USD. currency=ARS si figura en pesos.\n' +
+    '5. Para cuotas: buscar patrones como C.03/12 o 3/12 o cuota 3 de 12. cuotaActual=3, cuotas=12.\n' +
+    '6. Las extensiones tienen su propia seccion con el nombre del titular.\n' +
+    '7. minimo y total son los valores que figuran explicitamente en el resumen como PAGO MINIMO y SALDO ACTUAL.';
 
   userContent.push({ type: 'text', text: prompt });
 
@@ -936,7 +964,9 @@ function renderHistorico() {
             var eiCuotas = (ei.cuotas && ei.cuotas > 1)
               ? ' <span class="badge blue" style="font-size:10px">' + (ei.cuotaActual || '?') + '/' + ei.cuotas + '</span>' : '';
             var eiCurr = (ei.currency === 'USD') ? 'U$S ' : '$';
-            extHtml += '<tr><td>' + (ei.desc || '-') + eiCuotas + '</td><td class="num" style="text-align:right">' + eiCurr + fmt(ei.amount || 0) + '</td></tr>';
+            var eiStyle = ei.isCredit ? 'color:var(--green)' : '';
+            var eiSign = ei.isCredit ? '-' : '';
+            extHtml += '<tr><td>' + (ei.desc || '-') + eiCuotas + '</td><td class="num" style="text-align:right;' + eiStyle + '">' + eiSign + eiCurr + fmt(ei.amount || 0) + '</td></tr>';
           }
           extHtml += '</tbody></table>';
         }
