@@ -501,43 +501,82 @@ function renderCatSummary() {
 let uploadedFileData = null;
 let uploadedFileType = null;
 
+function resetDropZone(msg) {
+  uploadedFileData = null;
+  uploadedFileType = null;
+  var zone = document.getElementById('drop-zone');
+  zone.innerHTML = msg
+    ? '<div class="icon" style="font-size:20px">!</div><div style="color:var(--text2)">' + msg + '</div><div class="hint">Toca para intentar con otro archivo</div>'
+    : '<div class="icon">&#8593;</div><div>Toca para subir imagen o PDF del resumen</div><div class="hint">JPG &middot; PNG &middot; PDF</div>';
+}
+
 async function handleFile(inp) {
-  const f = inp.files[0]; if (!f) return;
+  var f = inp.files[0]; if (!f) return;
+  // Reset input so same file can be re-selected
+  inp.value = '';
   uploadedFileType = f.type;
-  const zone = document.getElementById('drop-zone');
+  var zone = document.getElementById('drop-zone');
   zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">Listo para extraer</div>';
 
-  const arrayBuf = await f.arrayBuffer();
-  const bytes = new Uint8Array(arrayBuf);
-
-  // Check if PDF is password protected by looking for /Encrypt in the file
-  if (f.type === 'application/pdf') {
-    const text = new TextDecoder('latin1').decode(bytes);
-    const isEncrypted = text.includes('/Encrypt');
-    if (isEncrypted) {
-      const pwd = prompt('Este PDF tiene contraseña. Ingresala para continuar:');
-      if (pwd === null) { zone.innerHTML = '<div class="icon">!</div><div>Cancelado</div>'; return; }
-      try {
-        // Use pdf-lib to decrypt
-        const { PDFDocument } = PDFLib;
-        const pdfDoc = await PDFDocument.load(arrayBuf, { password: pwd });
-        const decryptedBytes = await pdfDoc.save();
-        const base64 = btoa(String.fromCharCode(...decryptedBytes));
-        uploadedFileData = base64;
-        zone.innerHTML = '<div class="icon">v</div><div>' + f.name + ' (desencriptado)</div><div class="hint">Listo para extraer</div>';
-        return;
-      } catch(e) {
-        alert('Contrasena incorrecta o no se pudo desencriptar el PDF.');
-        zone.innerHTML = '<div class="icon">!</div><div>Error al desencriptar</div>';
-        return;
-      }
-    }
+  if (f.type !== 'application/pdf') {
+    // Image — just read as base64
+    var r = new FileReader();
+    r.onload = function(e) { uploadedFileData = e.target.result.split(',')[1]; };
+    r.readAsDataURL(f);
+    return;
   }
 
-  // Normal file - just read as base64
-  const r = new FileReader();
-  r.onload = e => { uploadedFileData = e.target.result.split(',')[1]; };
-  r.readAsDataURL(f);
+  // PDF — check if encrypted using pdfjs
+  var arrayBuf = await f.arrayBuffer();
+  var bytes = new Uint8Array(arrayBuf);
+  var text = new TextDecoder('latin1').decode(bytes.slice(0, 4096));
+  var isEncrypted = text.includes('/Encrypt');
+
+  if (!isEncrypted) {
+    // Normal PDF
+    var base64 = btoa(bytes.reduce(function(d, b){ return d + String.fromCharCode(b); }, ''));
+    uploadedFileData = base64;
+    return;
+  }
+
+  // Encrypted — use pdfjs to render pages to canvas then rebuild PDF
+  zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">PDF protegido, solicitando contraseña...</div>';
+  var pwd = prompt('Este PDF tiene contraseña. Ingresala para continuar:');
+  if (pwd === null) { resetDropZone('Cancelado'); return; }
+
+  try {
+    var pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+    var loadingTask = pdfjsLib.getDocument({ data: arrayBuf, password: pwd });
+    var pdfDoc = await loadingTask.promise;
+
+    // Render each page to canvas and collect image data
+    var pageImages = [];
+    for (var p = 1; p <= pdfDoc.numPages; p++) {
+      var page = await pdfDoc.getPage(p);
+      var viewport = page.getViewport({ scale: 2.0 });
+      var canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      var ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      pageImages.push(canvas.toDataURL('image/jpeg', 0.92).split(',')[1]);
+    }
+
+    // If single page, send as image; if multi-page, send first page as image
+    // and note in extraction
+    uploadedFileData = pageImages[0];
+    uploadedFileType = 'image/jpeg';
+    // If multi-page, combine all images by sending them together
+    if (pageImages.length > 1) {
+      window._allPageImages = pageImages;
+    }
+    zone.innerHTML = '<div class="icon">v</div><div>' + f.name + ' (' + pdfDoc.numPages + ' pag, desencriptado)</div><div class="hint">Listo para extraer</div>';
+  } catch(e) {
+    var msg = e.message && e.message.toLowerCase().includes('password') ? 'Contrasena incorrecta. Intentalo de nuevo.' : 'No se pudo abrir el PDF: ' + e.message;
+    resetDropZone(msg);
+  }
 }
 
 async function extractWithAI() {
@@ -548,9 +587,14 @@ async function extractWithAI() {
   btn.disabled = true;
   document.getElementById('confirm-btn').style.display = 'none';
 
-  const userContent = [];
+  var userContent = [];
   if (uploadedFileType && uploadedFileType.startsWith('image/')) {
-    userContent.push({ type: 'image', source: { type: 'base64', media_type: uploadedFileType, data: uploadedFileData } });
+    // If multi-page PDF was converted to images, send all pages
+    var pages = (window._allPageImages && window._allPageImages.length > 1) ? window._allPageImages : [uploadedFileData];
+    for (var pi = 0; pi < pages.length; pi++) {
+      userContent.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: pages[pi] } });
+    }
+    window._allPageImages = null;
   } else {
     userContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: uploadedFileData } });
   }
@@ -616,6 +660,7 @@ function confirmExtraction() {
   pendingExtraction = null;
   document.getElementById('ai-output').textContent = 'Guardado correctamente.';
   document.getElementById('confirm-btn').style.display = 'none';
+  resetDropZone();
   renderDashboard();
 }
 
@@ -667,14 +712,16 @@ function populateHistoricoFilters() {
 
 function renderHistorico() {
   var cardFilter = (document.getElementById('hf-card') || {}).value || '';
-  var monthFilter = (document.getElementById('hf-month') || {}).value || '';
+  var fromFilter = (document.getElementById('hf-from') || {}).value || '';
+  var toFilter   = (document.getElementById('hf-to')   || {}).value || '';
   var items = db.summaries.slice().sort(function(a, b) {
     var da = a.uploadedAt || a.id || '';
     var db2 = b.uploadedAt || b.id || '';
     return db2 < da ? -1 : db2 > da ? 1 : 0;
   });
   if (cardFilter) items = items.filter(function(s){ return s.cardId === cardFilter; });
-  if (monthFilter) items = items.filter(function(s){ return s.month === monthFilter; });
+  if (fromFilter) items = items.filter(function(s){ return s.month >= fromFilter; });
+  if (toFilter)   items = items.filter(function(s){ return s.month <= toFilter; });
   var el = document.getElementById('historico-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Sin resumenes</div>'; return; }
 
