@@ -455,5 +455,9 @@
 <script src="https://accounts.google.com/gsi/client"></script>
 <script src="sheets.js"></script>
 <script src="app.js"></script>
+<script>
+  loadCfg();
+  if (cfg.clientId && cfg.apiKey && cfg.sheetId) { useSheets = true; launchApp(); }
+</script>
 </body>
 </html>
