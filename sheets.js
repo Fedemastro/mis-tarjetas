@@ -141,7 +141,7 @@ async function sheetWrite(spreadsheetId, sheetName, rows) {
 // ─── Serializers ──────────────────────────────────────────────────────────
 
 function cardsToRows(cards) {
-  const h = ['id','name','bank','autoDebit'];
+  const h = ['id','name','bank','type','autoDebit'];
   return [h, ...cards.map(c => h.map(k => c[k] ?? ''))];
 }
 function rowsToCards(rows) {
@@ -151,12 +151,13 @@ function rowsToCards(rows) {
 }
 
 function summariesToRows(summaries) {
-  const h = ['id','cardId','cardName','month','vencimiento','minimo','total','totalUSD','ownExpenses','extensions'];
+  const h = ['id','cardId','cardName','month','vencimiento','minimo','total','totalUSD','ownExpenses','extensions','uploadedAt'];
   return [h, ...summaries.map(s => [
     s.id, s.cardId, s.cardName, s.month, s.vencimiento,
     s.minimo, s.total, s.totalUSD,
     JSON.stringify(s.ownExpenses || []),
-    JSON.stringify(s.extensions || [])
+    JSON.stringify(s.extensions || []),
+    s.uploadedAt || ''
   ])];
 }
 function rowsToSummaries(rows) {
