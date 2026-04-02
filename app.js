@@ -1,7 +1,7 @@
 // app.js — logica principal de la app
 
 // URL del proxy Cloudflare Workers — actualizá esto despues de desplegar el worker
-const PROXY_URL = 'https://claudeworker.fedemusic2008.workers.dev';
+const PROXY_URL = 'https://TU-WORKER.TU-USUARIO.workers.dev';
 
 let db = {
   cards: [], extHolders: [], summaries: [],
@@ -444,6 +444,8 @@ Los gastos propios (ownExpenses) son del titular principal. Las extensiones tien
       body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: userContent }] })
     });
     const data = await resp.json();
+    if (data.error || !data.content) { out.textContent = 'Error de API:
+' + JSON.stringify(data, null, 2); btn.disabled = false; return; }
     const text = data.content.map(i => i.text || '').join('');
     const clean = text.replace(/```json|```/g, '').trim();
     try {
