@@ -141,6 +141,7 @@ function nav(btn, sec) {
   if (sec === 'extensiones') { renderExtHolders(); renderExtSummary(); }
   if (sec === 'gastos')      { populateGastoCats(); populateGastoTerceroSelects(); renderGastos(); renderGastosTerceros(); }
   if (sec === 'categorias')  { renderCats(); renderCatSummary(); }
+  if (sec === 'historico')   { populateHistoricoFilters(); renderHistorico(); }
   if (sec === 'config')      updateConfigFields();
 }
 
@@ -243,22 +244,69 @@ function renderDashboard() {
 
 // --- Cards ---
 
-function addCard() {
+function saveCard() {
   const name = document.getElementById('tc-name').value.trim();
+  const bank = document.getElementById('tc-bank').value.trim();
+  const type = document.getElementById('tc-type').value;
+  const auto = document.getElementById('tc-auto').value;
+  const editId = document.getElementById('tc-edit-id').value;
   if (!name) return;
-  db.cards.push({ id: 'c' + Date.now(), name, bank: document.getElementById('tc-bank').value.trim(), autoDebit: document.getElementById('tc-auto').value });
-  saveAndSync(); renderCards(); populateCardSelects();
-  document.getElementById('tc-name').value = ''; document.getElementById('tc-bank').value = '';
+  if (editId) {
+    const c = db.cards.find(c => c.id === editId);
+    if (c) { c.name = name; c.bank = bank; c.type = type; c.autoDebit = auto; }
+  } else {
+    db.cards.push({ id: 'c' + Date.now(), name, bank, type, autoDebit: auto });
+  }
+  saveAndSync(); renderCards(); populateCardSelects(); cancelEditCard();
+}
+
+function editCard(id) {
+  const c = db.cards.find(c => c.id === id);
+  if (!c) return;
+  document.getElementById('tc-name').value = c.name || '';
+  document.getElementById('tc-bank').value = c.bank || '';
+  document.getElementById('tc-type').value = c.type || 'VISA';
+  document.getElementById('tc-auto').value = c.autoDebit || 'no';
+  document.getElementById('tc-edit-id').value = id;
+  document.getElementById('card-form-title').textContent = 'Editar tarjeta';
+  document.getElementById('card-save-btn').textContent = 'Guardar cambios';
+  document.getElementById('card-cancel-btn').style.display = 'inline-block';
+  document.getElementById('card-form-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEditCard() {
+  document.getElementById('tc-name').value = '';
+  document.getElementById('tc-bank').value = '';
+  document.getElementById('tc-type').value = 'VISA';
+  document.getElementById('tc-auto').value = 'no';
+  document.getElementById('tc-edit-id').value = '';
+  document.getElementById('card-form-title').textContent = 'Nueva tarjeta';
+  document.getElementById('card-save-btn').textContent = 'Agregar tarjeta';
+  document.getElementById('card-cancel-btn').style.display = 'none';
 }
 
 function renderCards() {
   const el = document.getElementById('cards-list');
-  if (!db.cards.length) { el.innerHTML = '<div class="empty">Sin tarjetas</div>'; return; }
-  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Banco</th><th>Deb. auto</th><th></th></tr></thead><tbody>' +
-    db.cards.map(c =>
-      '<tr><td><b>' + c.name + '</b></td><td>' + (c.bank || '-') + '</td>' +
+  const filter = (document.getElementById('cards-filter') || {}).value || '';
+  let cards = [...db.cards].sort((a, b) => {
+    const ka = (a.bank || '') + '|' + (a.name || '');
+    const kb = (b.bank || '') + '|' + (b.name || '');
+    return ka.localeCompare(kb, 'es');
+  });
+  if (filter) {
+    const f = filter.toLowerCase();
+    cards = cards.filter(c => (c.name || '').toLowerCase().includes(f) || (c.bank || '').toLowerCase().includes(f));
+  }
+  if (!cards.length) { el.innerHTML = '<div class="empty">Sin tarjetas</div>'; return; }
+  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Banco</th><th>Nombre</th><th>Tipo</th><th>Deb. auto</th><th></th></tr></thead><tbody>' +
+    cards.map(c =>
+      '<tr><td>' + (c.bank || '-') + '</td><td><b>' + c.name + '</b></td>' +
+      '<td><span class="tag">' + (c.type || '-') + '</span></td>' +
       '<td><span class="badge ' + (c.autoDebit === 'yes' ? 'amber' : 'green') + '">' + (c.autoDebit === 'yes' ? 'si' : 'no') + '</span></td>' +
-      '<td><button class="btn danger sm" onclick="delCard(\'' + c.id + '\')">x</button></td></tr>'
+      '<td style="display:flex;gap:4px">' +
+        '<button class="btn sm" onclick="editCard(\'' + c.id + '\')">editar</button>' +
+        '<button class="btn danger sm" onclick="delCard(\'' + c.id + '\')">x</button>' +
+      '</td></tr>'
     ).join('') +
     '</tbody></table></div>';
 }
@@ -270,7 +318,8 @@ function delCard(id) {
 }
 
 function populateCardSelects() {
-  const opts = '<option value="">Seleccionar...</option>' + db.cards.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+  const sorted = [...db.cards].sort((a, b) => ((a.bank||'')+'|'+(a.name||'')).localeCompare((b.bank||'')+'|'+(b.name||''), 'es'));
+  const opts = '<option value="">Seleccionar...</option>' + sorted.map(c => '<option value="' + c.id + '">' + (c.bank ? c.bank + ' - ' : '') + c.name + '</option>').join('');
   ['upload-card','m-card','gt-card'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = opts; });
 }
 
@@ -524,7 +573,7 @@ function confirmExtraction() {
   const card   = db.cards.find(c => c.id === cardId) || null;
   const p = pendingExtraction;
   db.summaries.push({
-    id: 's' + Date.now(), cardId,
+    id: 's' + Date.now(), cardId, uploadedAt: new Date().toISOString(),
     cardName: card ? card.name : (p.cardName || 'Tarjeta'),
     month, vencimiento: p.vencimiento || '',
     minimo: Number(p.minimo || 0),
@@ -564,7 +613,7 @@ function saveManual() {
     if (inp.value.trim()) exts.push({ holder: inp.value.trim(), total: Number(tot ? tot.value : 0), items: [] });
   });
   db.summaries.push({
-    id: 's' + Date.now(), cardId, cardName: card.name, month,
+    id: 's' + Date.now(), cardId, cardName: card.name, uploadedAt: new Date().toISOString(), month,
     vencimiento: document.getElementById('m-venc').value,
     minimo: Number(document.getElementById('m-min').value || 0),
     total: Number(document.getElementById('m-total').value || 0),
@@ -574,6 +623,69 @@ function saveManual() {
   saveAndSync();
   alert('Guardado correctamente');
   renderDashboard();
+}
+
+
+// --- Historico ---
+
+function populateHistoricoFilters() {
+  const el = document.getElementById('hf-card');
+  if (!el) return;
+  el.innerHTML = '<option value="">Todas las tarjetas</option>' +
+    db.cards.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+}
+
+function renderHistorico() {
+  const cardFilter = (document.getElementById('hf-card') || {}).value || '';
+  const monthFilter = (document.getElementById('hf-month') || {}).value || '';
+  let items = [...db.summaries].sort((a, b) => {
+    const da = a.uploadedAt || a.id || '';
+    const db2 = b.uploadedAt || b.id || '';
+    return db2.localeCompare(da);
+  });
+  if (cardFilter) items = items.filter(s => s.cardId === cardFilter);
+  if (monthFilter) items = items.filter(s => s.month === monthFilter);
+  const el = document.getElementById('historico-list');
+  if (!items.length) { el.innerHTML = '<div class="empty">Sin resumenes</div>'; return; }
+  el.innerHTML = items.map(s => {
+    const card = db.cards.find(c => c.id === s.cardId) || { name: s.cardName || 'Tarjeta' };
+    const uploadDate = s.uploadedAt ? new Date(s.uploadedAt).toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '-';
+    const ownCount = (s.ownExpenses || []).length;
+    const extCount = (s.extensions || []).reduce((a, e) => a + (e.items || []).length, 0);
+    const expenses = s.ownExpenses || [];
+    const expRows = expenses.length
+      ? expenses.map(e => {
+          const cuotas = e.cuotas ? (' <span class="badge blue">' + e.cuotaActual + '/' + e.cuotas + ' cuotas</span>') : '';
+          return '<tr><td>' + (e.desc || '-') + cuotas + '</td><td><span class="tag">' + (e.category || '-') + '</span></td><td class="num">$' + fmt(e.amount || 0) + '</td></tr>';
+        }).join('')
+      : '<tr><td colspan="3" style="color:var(--text2)">Sin detalle de gastos</td></tr>';
+    const extSections = (s.extensions || []).map(ext =>
+      '<div style="margin-top:8px"><b>' + ext.holder + '</b>: $' + fmt(ext.total || 0) + '</div>'
+    ).join('');
+    return '<div class="card" style="margin-bottom:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px">' +
+        '<div>' +
+          '<div style="font-weight:500;font-size:14px">' + card.name + ' <span class="tag">' + s.month + '</span></div>' +
+          '<div style="font-size:11px;color:var(--text2);margin-top:3px">Subido: ' + uploadDate + ' &nbsp;·&nbsp; ' + ownCount + ' gastos propios &nbsp;·&nbsp; ' + extCount + ' de extensiones</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px;align-items:center">' +
+          '<div style="text-align:right">' +
+            '<div class="num" style="font-size:14px;font-weight:500">$' + fmt(s.total || 0) + (s.totalUSD > 0 ? ' &nbsp; U$S ' + fmt(s.totalUSD) : '') + '</div>' +
+            '<div style="font-size:11px;color:var(--text2)">Min: $' + fmt(s.minimo || 0) + ' &nbsp;·&nbsp; Vence: ' + fmtDate(s.vencimiento) + '</div>' +
+          '</div>' +
+          '<button class="btn danger sm" onclick="delSummary(\'' + s.id + '\')">Eliminar</button>' +
+        '</div>' +
+      '</div>' +
+      (expenses.length ? '<div class="table-wrap"><table><thead><tr><th>Descripcion</th><th>Categoria</th><th>Monto</th></tr></thead><tbody>' + expRows + '</tbody></table></div>' : '') +
+      (extSections ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">EXTENSIONES</div>' + extSections + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function delSummary(id) {
+  if (!confirm('Eliminar este resumen? Esta accion no se puede deshacer.')) return;
+  db.summaries = db.summaries.filter(s => s.id !== id);
+  saveAndSync(); renderHistorico();
 }
 
 // --- Config ---
