@@ -8,6 +8,7 @@ const SHEETS = {
   EXT_HOLDERS:    'extHolders',
   CATEGORIES:     'categories',
   CONFIG:         'config',
+  PAYMENTS:        'payments',
 };
 
 let gisInited = false;
@@ -227,6 +228,7 @@ async function pushToSheets(spreadsheetId, db) {
       sheetWrite(spreadsheetId, SHEETS.GASTOS_TERC, gastosTercToRows(db.gastosTerceros)),
       sheetWrite(spreadsheetId, SHEETS.EXT_HOLDERS, extHoldersToRows(db.extHolders)),
       sheetWrite(spreadsheetId, SHEETS.CATEGORIES,  categoriesToRows(db.categories)),
+      sheetWrite(spreadsheetId, SHEETS.PAYMENTS,    paymentsToRows(db.payments || {})),
     ]);
     return true;
   } catch(e) { console.error('pushToSheets error', e); return false; }
@@ -238,13 +240,14 @@ async function pullFromSheets(spreadsheetId) {
   if (!isAuthorized || !spreadsheetId) return null;
   try {
     await ensureSheets(spreadsheetId);
-    const [cards, summaries, gastos, gastosTer, extHolders, categories] = await Promise.all([
+    const [cards, summaries, gastos, gastosTer, extHolders, categories, payments] = await Promise.all([
       sheetRead(spreadsheetId, SHEETS.CARDS),
       sheetRead(spreadsheetId, SHEETS.SUMMARIES),
       sheetRead(spreadsheetId, SHEETS.GASTOS),
       sheetRead(spreadsheetId, SHEETS.GASTOS_TERC),
       sheetRead(spreadsheetId, SHEETS.EXT_HOLDERS),
       sheetRead(spreadsheetId, SHEETS.CATEGORIES),
+      sheetRead(spreadsheetId, SHEETS.PAYMENTS),
     ]);
     return {
       cards:          rowsToCards(cards),
@@ -252,9 +255,28 @@ async function pullFromSheets(spreadsheetId) {
       gastos:         rowsToGastos(gastos),
       gastosTerceros: rowsToGastosTer(gastosTer),
       extHolders:     rowsToExtHolders(extHolders),
+      payments:       rowsToPayments(payments),
       categories:     rowsToCategories(categories).length
                       ? rowsToCategories(categories)
                       : ['Supermercado','Restaurantes / Comida','Nafta / Transporte','Servicios','Salud','Ropa / Indumentaria','Entretenimiento','Viajes','Otros'],
     };
   } catch(e) { console.error('pullFromSheets error', e); return null; }
+}
+
+function paymentsToRows(payments) {
+  const rows = [['summaryId','ars','usd','full']];
+  Object.keys(payments).forEach(id => {
+    const p = payments[id];
+    rows.push([id, p.ars||'', p.usd||'', p.full?'1':'0']);
+  });
+  return rows;
+}
+function rowsToPayments(rows) {
+  if (!rows || rows.length < 2) return {};
+  const result = {};
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (r[0]) result[r[0]] = { ars: r[1]||'', usd: r[2]||'', full: r[3]==='1' };
+  }
+  return result;
 }
