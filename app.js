@@ -501,10 +501,40 @@ function renderCatSummary() {
 let uploadedFileData = null;
 let uploadedFileType = null;
 
-function handleFile(inp) {
+async function handleFile(inp) {
   const f = inp.files[0]; if (!f) return;
   uploadedFileType = f.type;
-  document.getElementById('drop-zone').innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">Listo para extraer</div>';
+  const zone = document.getElementById('drop-zone');
+  zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">Listo para extraer</div>';
+
+  const arrayBuf = await f.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuf);
+
+  // Check if PDF is password protected by looking for /Encrypt in the file
+  if (f.type === 'application/pdf') {
+    const text = new TextDecoder('latin1').decode(bytes);
+    const isEncrypted = text.includes('/Encrypt');
+    if (isEncrypted) {
+      const pwd = prompt('Este PDF tiene contraseña. Ingresala para continuar:');
+      if (pwd === null) { zone.innerHTML = '<div class="icon">!</div><div>Cancelado</div>'; return; }
+      try {
+        // Use pdf-lib to decrypt
+        const { PDFDocument } = PDFLib;
+        const pdfDoc = await PDFDocument.load(arrayBuf, { password: pwd });
+        const decryptedBytes = await pdfDoc.save();
+        const base64 = btoa(String.fromCharCode(...decryptedBytes));
+        uploadedFileData = base64;
+        zone.innerHTML = '<div class="icon">v</div><div>' + f.name + ' (desencriptado)</div><div class="hint">Listo para extraer</div>';
+        return;
+      } catch(e) {
+        alert('Contrasena incorrecta o no se pudo desencriptar el PDF.');
+        zone.innerHTML = '<div class="icon">!</div><div>Error al desencriptar</div>';
+        return;
+      }
+    }
+  }
+
+  // Normal file - just read as base64
   const r = new FileReader();
   r.onload = e => { uploadedFileData = e.target.result.split(',')[1]; };
   r.readAsDataURL(f);
