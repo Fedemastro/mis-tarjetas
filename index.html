@@ -223,6 +223,7 @@
     <button onclick="nav(this,'extensiones')">Extensiones</button>
     <button onclick="nav(this,'gastos')">Gastos extra</button>
     <button onclick="nav(this,'categorias')">Categorías</button>
+    <button onclick="nav(this,'historico')">Histórico</button>
     <button onclick="nav(this,'config')">Config</button>
   </nav>
   <main>
@@ -298,19 +299,27 @@
 
     <!-- TARJETAS -->
     <div class="section" id="s-tarjetas">
-      <div class="card">
-        <div class="card-title">Nueva tarjeta</div>
+      <div class="card" id="card-form-section">
+        <div class="card-title" id="card-form-title">Nueva tarjeta</div>
         <div class="form-row">
           <div class="form-col"><label>Nombre</label><input id="tc-name" placeholder="VISA Galicia"></div>
           <div class="form-col"><label>Banco</label><input id="tc-bank" placeholder="Galicia"></div>
         </div>
         <div class="form-row">
+          <div class="form-col"><label>Tipo</label><select id="tc-type"><option value="VISA">VISA</option><option value="Mastercard">Mastercard</option><option value="American Express">American Express</option><option value="Naranja">Naranja</option><option value="Otro">Otro</option></select></div>
           <div class="form-col"><label>Débito automático mínimo</label><select id="tc-auto"><option value="no">No</option><option value="yes">Sí</option></select></div>
         </div>
-        <button class="btn primary" onclick="addCard()">Agregar tarjeta</button>
+        <input type="hidden" id="tc-edit-id">
+        <div style="display:flex;gap:8px">
+          <button class="btn primary" id="card-save-btn" onclick="saveCard()">Agregar tarjeta</button>
+          <button class="btn" id="card-cancel-btn" onclick="cancelEditCard()" style="display:none">Cancelar</button>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">Mis tarjetas</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <input type="text" id="cards-filter" placeholder="Filtrar por banco o nombre..." oninput="renderCards()" style="max-width:280px">
+        </div>
         <div id="cards-list"><div class="empty">Sin tarjetas</div></div>
       </div>
     </div>
@@ -410,6 +419,19 @@
           <input type="month" id="cat-month-filter" onchange="renderCatSummary()" style="width:160px;margin-bottom:12px">
           <div id="cat-summary"><div class="empty">Seleccioná un mes</div></div>
         </div>
+      </div>
+    </div>
+
+
+    <!-- HISTORICO -->
+    <div class="section" id="s-historico">
+      <div class="card">
+        <div class="card-title">Histórico de resúmenes cargados</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <select id="hf-card" onchange="renderHistorico()" style="width:180px"><option value="">Todas las tarjetas</option></select>
+          <input type="month" id="hf-month" onchange="renderHistorico()" style="width:160px">
+        </div>
+        <div id="historico-list"><div class="empty">Sin resúmenes cargados</div></div>
       </div>
     </div>
 
