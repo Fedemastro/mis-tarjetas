@@ -521,8 +521,6 @@ function toBase64(bytes) {
 }
 
 async function decryptPDF(arrayBuf, password) {
-  // Send encrypted PDF to Cloudflare Worker for server-side decryption
-  // Worker returns extracted text pages which we send as text to Claude
   var bytes = new Uint8Array(arrayBuf);
   var binary = '';
   var chunkSize = 8192;
@@ -546,8 +544,8 @@ async function decryptPDF(arrayBuf, password) {
     throw new Error(data.message || data.error);
   }
 
-  // Return pages as text — will be sent to Claude as text content
-  return { type: 'text', pages: data.pages };
+  // Return decrypted PDF as base64 to send to Claude as PDF document
+  return { type: 'pdf', pdfBase64: data.pdfBase64 };
 }
 
 async function handleFile(inp) {
@@ -593,11 +591,10 @@ async function handleFile(inp) {
 
   try {
     var result = await decryptPDF(arrayBuf, pwd);
-    // Store decrypted text pages for extraction
-    window._decryptedPages = result.pages;
-    uploadedFileData = null; // not sending raw PDF
-    uploadedFileType = 'text/plain';
-    zone.innerHTML = '<div class="icon">v</div><div>' + f.name + ' (' + result.pages.length + ' pág, desencriptado)</div><div class="hint">Listo para extraer</div>';
+    uploadedFileData = result.pdfBase64;
+    uploadedFileType = 'application/pdf';
+    window._decryptedPages = null;
+    zone.innerHTML = '<div class="icon">v</div><div>' + f.name + ' (desencriptado)</div><div class="hint">Listo para extraer</div>';
   } catch(e) {
     var errMsg = e.message || '';
     if (errMsg === 'wrong_password' || errMsg.toLowerCase().indexOf('password') !== -1) {
@@ -618,12 +615,7 @@ async function extractWithAI() {
   document.getElementById('confirm-btn').style.display = 'none';
 
   var userContent = [];
-  if (window._decryptedPages && window._decryptedPages.length > 0) {
-    // PDF was decrypted server-side — send extracted text
-    var fullText = window._decryptedPages.join('\n\n--- pagina siguiente ---\n\n');
-    userContent.push({ type: 'text', text: 'Contenido del resumen de tarjeta (extraido de PDF):\n\n' + fullText });
-    window._decryptedPages = null;
-  } else if (uploadedFileType && uploadedFileType.startsWith('image/')) {
+  if (uploadedFileType && uploadedFileType.startsWith('image/')) {
     var pages = (window._allPageImages && window._allPageImages.length > 0)
       ? window._allPageImages.slice(0, 5)
       : [uploadedFileData];
