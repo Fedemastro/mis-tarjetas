@@ -104,7 +104,7 @@ async function sheetWrite(spreadsheetId, sheetName, rows) {
 // ─── Serializers ──────────────────────────────────────────────────────────
 
 function cardsToRows(cards) {
-  const h = ['id','name','bank','currency','autoDebit'];
+  const h = ['id','name','bank','autoDebit'];
   return [h, ...cards.map(c => h.map(k => c[k] ?? ''))];
 }
 function rowsToCards(rows) {
