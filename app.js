@@ -555,17 +555,17 @@ async function extractWithAI() {
     userContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: uploadedFileData } });
   }
 
-  const prompt = 'Analiza este resumen de tarjeta de credito argentina. Extrae los datos y responde SOLO con JSON valido, sin markdown ni backticks:\n' +
+  const prompt = 'Analiza este resumen de tarjeta de credito argentina. Extrae TODOS los gastos y responde SOLO con JSON valido, sin markdown ni backticks:\n' +
     '{\n' +
     '  "cardName": "nombre de la tarjeta",\n' +
     '  "vencimiento": "YYYY-MM-DD",\n' +
     '  "minimo": numero en pesos,\n' +
     '  "total": numero en pesos,\n' +
     '  "totalUSD": numero en dolares (0 si no hay),\n' +
-    '  "ownExpenses": [{"desc":"nombre del comercio","amount":numero,"category":"una de: Supermercado/Restaurantes / Comida/Nafta / Transporte/Servicios/Salud/Ropa / Indumentaria/Entretenimiento/Viajes/Otros","date":"YYYY-MM-DD"}],\n' +
-    '  "extensions": [{"holder":"nombre del titular de extension","total":numero,"items":[{"desc":"comercio","amount":numero}]}]\n' +
+    '  "ownExpenses": [{"desc":"nombre del comercio","amount":numero en pesos de la cuota o del consumo,"category":"una de: Supermercado/Restaurantes / Comida/Nafta / Transporte/Servicios/Salud/Ropa / Indumentaria/Entretenimiento/Viajes/Otros","date":"YYYY-MM-DD","cuotas":numero total de cuotas (null si no es en cuotas),"cuotaActual":numero de cuota actual (null si no es en cuotas)}],\n' +
+    '  "extensions": [{"holder":"nombre del titular de extension","total":numero,"items":[{"desc":"comercio","amount":numero,"cuotas":numero total o null,"cuotaActual":numero actual o null}]}]\n' +
     '}\n' +
-    'Los gastos propios son del titular principal. Las extensiones tienen su propia seccion con el nombre del titular.';
+    'IMPORTANTE: incluir TODOS los gastos sin excepcion, tanto propios como de extensiones. Para consumos en cuotas, el campo amount debe ser el monto de la cuota que aparece en este resumen. Ejemplo cuotas: "cuotaActual":3,"cuotas":12. Las extensiones tienen su propia seccion separada con el nombre del titular.';
 
   userContent.push({ type: 'text', text: prompt });
 
@@ -666,50 +666,101 @@ function populateHistoricoFilters() {
 }
 
 function renderHistorico() {
-  const cardFilter = (document.getElementById('hf-card') || {}).value || '';
-  const monthFilter = (document.getElementById('hf-month') || {}).value || '';
-  let items = [...db.summaries].sort((a, b) => {
-    const da = a.uploadedAt || a.id || '';
-    const db2 = b.uploadedAt || b.id || '';
-    return db2.localeCompare(da);
+  var cardFilter = (document.getElementById('hf-card') || {}).value || '';
+  var monthFilter = (document.getElementById('hf-month') || {}).value || '';
+  var items = db.summaries.slice().sort(function(a, b) {
+    var da = a.uploadedAt || a.id || '';
+    var db2 = b.uploadedAt || b.id || '';
+    return db2 < da ? -1 : db2 > da ? 1 : 0;
   });
-  if (cardFilter) items = items.filter(s => s.cardId === cardFilter);
-  if (monthFilter) items = items.filter(s => s.month === monthFilter);
-  const el = document.getElementById('historico-list');
+  if (cardFilter) items = items.filter(function(s){ return s.cardId === cardFilter; });
+  if (monthFilter) items = items.filter(function(s){ return s.month === monthFilter; });
+  var el = document.getElementById('historico-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Sin resumenes</div>'; return; }
-  el.innerHTML = items.map(s => {
-    const card = db.cards.find(c => c.id === s.cardId) || { name: s.cardName || 'Tarjeta' };
-    const uploadDate = s.uploadedAt ? new Date(s.uploadedAt).toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '-';
-    const ownCount = (s.ownExpenses || []).length;
-    const extCount = (s.extensions || []).reduce((a, e) => a + (e.items || []).length, 0);
-    const expenses = s.ownExpenses || [];
-    const expRows = expenses.length
-      ? expenses.map(e => {
-          const cuotas = e.cuotas ? (' <span class="badge blue">' + e.cuotaActual + '/' + e.cuotas + ' cuotas</span>') : '';
-          return '<tr><td>' + (e.desc || '-') + cuotas + '</td><td><span class="tag">' + (e.category || '-') + '</span></td><td class="num">$' + fmt(e.amount || 0) + '</td></tr>';
-        }).join('')
-      : '<tr><td colspan="3" style="color:var(--text2)">Sin detalle de gastos</td></tr>';
-    const extSections = (s.extensions || []).map(ext =>
-      '<div style="margin-top:8px"><b>' + ext.holder + '</b>: $' + fmt(ext.total || 0) + '</div>'
-    ).join('');
-    return '<div class="card" style="margin-bottom:12px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:12px">' +
-        '<div>' +
-          '<div style="font-weight:500;font-size:14px">' + card.name + ' <span class="tag">' + s.month + '</span></div>' +
-          '<div style="font-size:11px;color:var(--text2);margin-top:3px">Subido: ' + uploadDate + ' &nbsp;·&nbsp; ' + ownCount + ' gastos propios &nbsp;·&nbsp; ' + extCount + ' de extensiones</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:6px;align-items:center">' +
-          '<div style="text-align:right">' +
-            '<div class="num" style="font-size:14px;font-weight:500">$' + fmt(s.total || 0) + (s.totalUSD > 0 ? ' &nbsp; U$S ' + fmt(s.totalUSD) : '') + '</div>' +
-            '<div style="font-size:11px;color:var(--text2)">Min: $' + fmt(s.minimo || 0) + ' &nbsp;·&nbsp; Vence: ' + fmtDate(s.vencimiento) + '</div>' +
-          '</div>' +
-          '<button class="btn danger sm" onclick="delSummary(\'' + s.id + '\')">Eliminar</button>' +
-        '</div>' +
+
+  var rows = '';
+  for (var i = 0; i < items.length; i++) {
+    var s = items[i];
+    var card = db.cards.find(function(c){ return c.id === s.cardId; }) || { name: s.cardName || 'Tarjeta' };
+    var dt = s.uploadedAt ? new Date(s.uploadedAt) : null;
+    var dateStr = dt ? dt.toLocaleDateString('es-AR', { day:'2-digit', month:'short', year:'numeric' }) : '-';
+    var timeStr = dt ? dt.toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' }) : '';
+    var expenses = s.ownExpenses || [];
+    var extensions = s.extensions || [];
+    var sid = s.id;
+
+    var expRows = '';
+    for (var j = 0; j < expenses.length; j++) {
+      var e = expenses[j];
+      var cuotasTag = (e.cuotas && e.cuotas > 1)
+        ? ' <span class="badge blue" style="font-size:10px">' + (e.cuotaActual || '?') + '/' + e.cuotas + ' cuotas</span>'
+        : '';
+      expRows += '<tr><td>' + (e.desc || '-') + cuotasTag + '</td>' +
+        '<td><span class="tag">' + (e.category || '-') + '</span></td>' +
+        '<td class="num" style="text-align:right">$' + fmt(e.amount || 0) + '</td></tr>';
+    }
+
+    var extHtml = '';
+    if (extensions.length) {
+      extHtml = '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">' +
+        '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Extensiones</div>';
+      for (var k = 0; k < extensions.length; k++) {
+        var ext = extensions[k];
+        extHtml += '<div style="margin-bottom:8px"><b>' + ext.holder + '</b> &mdash; $' + fmt(ext.total || 0);
+        var extItems = ext.items || [];
+        if (extItems.length) {
+          extHtml += '<table style="width:100%;font-size:12px;margin-top:4px"><tbody>';
+          for (var m = 0; m < extItems.length; m++) {
+            var ei = extItems[m];
+            var eiCuotas = (ei.cuotas && ei.cuotas > 1)
+              ? ' <span class="badge blue" style="font-size:10px">' + (ei.cuotaActual || '?') + '/' + ei.cuotas + '</span>' : '';
+            extHtml += '<tr><td>' + (ei.desc || '-') + eiCuotas + '</td><td class="num" style="text-align:right">$' + fmt(ei.amount || 0) + '</td></tr>';
+          }
+          extHtml += '</tbody></table>';
+        }
+        extHtml += '</div>';
+      }
+      extHtml += '</div>';
+    }
+
+    var detailContent = expenses.length
+      ? '<table style="width:100%;font-size:12px"><thead><tr><th>Descripcion</th><th>Categoria</th><th style="text-align:right">Monto</th></tr></thead><tbody>' + expRows + '</tbody></table>' + extHtml
+      : '<div style="font-size:12px;color:var(--text2)">Sin detalle guardado</div>' + extHtml;
+
+    rows += '<tr style="cursor:pointer" onclick="toggleHistoricoRow(\'' + sid + '\', this)">' +
+      '<td style="color:var(--text2);font-size:12px" id="arr-' + sid + '">&#9654;</td>' +
+      '<td><b>' + card.name + '</b></td>' +
+      '<td><span class="tag">' + s.month + '</span></td>' +
+      '<td style="color:var(--text2);font-size:12px">' + dateStr + (timeStr ? ' ' + timeStr : '') + '</td>' +
+      '<td class="num" style="text-align:right">$' + fmt(s.total || 0) + '</td>' +
+      '<td class="num" style="text-align:right">' + (Number(s.totalUSD) > 0 ? 'U$S ' + fmt(s.totalUSD) : '-') + '</td>' +
+      '<td><button class="btn danger sm" onclick="event.stopPropagation();delSummary(\'' + sid + '\')">x</button></td>' +
+    '</tr>' +
+    '<tr id="det-' + sid + '" style="display:none"><td colspan="7" style="padding:0">' +
+      '<div style="background:var(--surface2);padding:12px 16px;border-bottom:1px solid var(--border)">' +
+        detailContent +
       '</div>' +
-      (expenses.length ? '<div class="table-wrap"><table><thead><tr><th>Descripcion</th><th>Categoria</th><th>Monto</th></tr></thead><tbody>' + expRows + '</tbody></table></div>' : '') +
-      (extSections ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">EXTENSIONES</div>' + extSections + '</div>' : '') +
-    '</div>';
-  }).join('');
+    '</td></tr>';
+  }
+
+  el.innerHTML = '<div class="table-wrap"><table style="width:100%">' +
+    '<thead><tr>' +
+      '<th style="width:24px"></th>' +
+      '<th>Tarjeta</th><th>Mes</th><th>Subido</th>' +
+      '<th style="text-align:right">Total $</th>' +
+      '<th style="text-align:right">Total U$S</th>' +
+      '<th></th>' +
+    '</tr></thead>' +
+    '<tbody>' + rows + '</tbody>' +
+    '</table></div>';
+}
+function toggleHistoricoRow(id, tr) {
+  const det = document.getElementById('det-' + id);
+  const arr = document.getElementById('arr-' + id);
+  if (!det) return;
+  const open = det.style.display !== 'none';
+  det.style.display = open ? 'none' : 'table-row';
+  if (arr) arr.textContent = open ? '▶' : '▼';
 }
 
 function delSummary(id) {
