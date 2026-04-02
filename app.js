@@ -236,7 +236,7 @@ function renderDashboard() {
 function addCard() {
   const name = document.getElementById('tc-name').value.trim();
   if (!name) return;
-  db.cards.push({ id: 'c' + Date.now(), name, bank: document.getElementById('tc-bank').value.trim(), currency: document.getElementById('tc-curr').value, autoDebit: document.getElementById('tc-auto').value });
+  db.cards.push({ id: 'c' + Date.now(), name, bank: document.getElementById('tc-bank').value.trim(), autoDebit: document.getElementById('tc-auto').value });
   saveAndSync(); renderCards(); populateCardSelects();
   document.getElementById('tc-name').value = ''; document.getElementById('tc-bank').value = '';
 }
@@ -244,8 +244,8 @@ function addCard() {
 function renderCards() {
   const el = document.getElementById('cards-list');
   if (!db.cards.length) { el.innerHTML = '<div class="empty">Sin tarjetas</div>'; return; }
-  el.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Banco</th><th>Moneda</th><th>Déb. auto</th><th></th></tr></thead><tbody>
-  ${db.cards.map(c => `<tr><td><b>${c.name}</b></td><td>${c.bank || '—'}</td><td>${c.currency || 'ARS'}</td><td><span class="badge ${c.autoDebit === 'yes' ? 'amber' : 'green'}">${c.autoDebit === 'yes' ? 'sí' : 'no'}</span></td><td><button class="btn danger sm" onclick="delCard('${c.id}')">×</button></td></tr>`).join('')}
+  el.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Nombre</th><th>Banco</th><th>Déb. auto</th><th></th></tr></thead><tbody>
+  ${db.cards.map(c => `<tr><td><b>${c.name}</b></td><td>${c.bank || '—'}</td><td><span class="badge ${c.autoDebit === 'yes' ? 'amber' : 'green'}">${c.autoDebit === 'yes' ? 'sí' : 'no'}</span></td><td><button class="btn danger sm" onclick="delCard('${c.id}')">×</button></td></tr>`).join('')}
   </tbody></table></div>`;
 }
 
