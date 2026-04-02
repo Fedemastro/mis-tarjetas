@@ -1,7 +1,7 @@
 // app.js — logica principal de la app
 
 // URL del proxy Cloudflare Workers — actualizá esto despues de desplegar el worker
-const PROXY_URL = 'https://TU-WORKER.TU-USUARIO.workers.dev';
+const PROXY_URL = 'https://claudeworker.fedemusic2008.workers.dev';
 
 let db = {
   cards: [], extHolders: [], summaries: [],
