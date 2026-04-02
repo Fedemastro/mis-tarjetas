@@ -429,7 +429,11 @@
         <div class="card-title">Histórico de resúmenes cargados</div>
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
           <select id="hf-card" onchange="renderHistorico()" style="width:180px"><option value="">Todas las tarjetas</option></select>
-          <input type="month" id="hf-month" onchange="renderHistorico()" style="width:160px">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Desde</label><input type="month" id="hf-from" onchange="renderHistorico()" style="width:150px"></div>
+            <div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Hasta</label><input type="month" id="hf-to" onchange="renderHistorico()" style="width:150px"></div>
+            <button class="btn sm" onclick="clearHistoricoFilters()" style="margin-top:14px">Limpiar</button>
+          </div>
         </div>
         <div id="historico-list"><div class="empty">Sin resúmenes cargados</div></div>
       </div>
@@ -473,7 +477,7 @@
 </div>
 
 <!-- pdf-lib for password-protected PDFs -->
-<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 
 <!-- Google APIs -->
 <script src="https://apis.google.com/js/api.js"></script>
