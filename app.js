@@ -69,9 +69,9 @@ async function manualSync() {
 // ─── Auth / init ───────────────────────────────────────────────────────────
 
 function initApp() {
-  const clientId = document.getElementById('cfg-client-id').value.trim();
-  const apiKey   = document.getElementById('cfg-api-key').value.trim();
-  const sheetId  = document.getElementById('cfg-sheet-id').value.trim();
+  const clientId = document.getElementById('cfg-client-id').value.trim() || cfg.clientId;
+  const apiKey   = document.getElementById('cfg-api-key').value.trim()   || cfg.apiKey;
+  const sheetId  = document.getElementById('cfg-sheet-id').value.trim()  || cfg.sheetId;
   if (!clientId || !apiKey || !sheetId) { alert('Completá todos los campos'); return; }
   cfg = { clientId, apiKey, sheetId };
   saveCfg();
@@ -559,3 +559,13 @@ function clearAll() {
     document.getElementById('cfg-sheet-id').value  = cfg.sheetId;
   }
 })();
+
+// Auto-launch if config already saved
+document.addEventListener('DOMContentLoaded', () => {
+  loadCfg();
+  if (cfg.clientId && cfg.apiKey && cfg.sheetId) {
+    // Config exists — skip auth screen and launch directly
+    useSheets = true;
+    launchApp();
+  }
+});
