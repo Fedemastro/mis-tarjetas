@@ -1,4 +1,7 @@
-// app.js — lógica principal de la app
+// app.js — logica principal de la app
+
+// URL del proxy Cloudflare Workers — actualizá esto despues de desplegar el worker
+const PROXY_URL = 'https://claudeworker.fedemusic2008.workers.dev';
 
 let db = {
   cards: [], extHolders: [], summaries: [],
@@ -435,7 +438,7 @@ async function extractWithAI() {
 Los gastos propios (ownExpenses) son del titular principal. Las extensiones tienen su propia sección en el resumen con el nombre del titular. Si hay gastos en cuotas, incluí el monto de la cuota del mes.` });
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: userContent }] })
