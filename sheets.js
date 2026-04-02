@@ -1,5 +1,4 @@
 // sheets.js — Google Sheets sync module
-// Cada pestaña de la Spreadsheet es una tabla: cards, summaries, gastos, gastosTerceros, extHolders, categories, config
 
 const SHEETS = {
   CARDS:          'cards',
@@ -18,6 +17,31 @@ let isAuthorized = false;
 
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 
+// ─── Token persistence ─────────────────────────────────────────────────────
+
+function saveToken(token) {
+  if (!token) return;
+  localStorage.setItem('gsheets_token', JSON.stringify({ ...token, saved_at: Date.now() }));
+}
+
+function loadSavedToken() {
+  try {
+    const raw = localStorage.getItem('gsheets_token');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // Token de Google dura 3600s — lo descartamos si pasaron más de 55 minutos
+    if ((Date.now() - data.saved_at) / 1000 > 3300) {
+      localStorage.removeItem('gsheets_token');
+      return null;
+    }
+    return data;
+  } catch { return null; }
+}
+
+function clearSavedToken() {
+  localStorage.removeItem('gsheets_token');
+}
+
 // ─── Init ──────────────────────────────────────────────────────────────────
 
 function sheetsInit(clientId, apiKey, onReady) {
@@ -35,17 +59,30 @@ function sheetsInit(clientId, apiKey, onReady) {
       callback: (resp) => {
         if (resp.error) { console.warn('OAuth error', resp); return; }
         isAuthorized = true;
+        saveToken(gapi.client.getToken());
         if (window._sheetsOnAuth) window._sheetsOnAuth();
       }
     });
     gisInited = true;
-    onReady(true);
+
+    // Intentar restaurar token guardado — evita pedir auth en cada recarga
+    const saved = loadSavedToken();
+    if (saved) {
+      gapi.client.setToken(saved);
+      isAuthorized = true;
+      onReady(true);
+      if (window._sheetsOnAuth) window._sheetsOnAuth();
+    } else {
+      onReady(true);
+    }
   });
 }
 
 function sheetsSignIn() {
   if (!tokenClient) return;
-  tokenClient.requestAccessToken({ prompt: 'consent' });
+  // Sin prompt si ya hubo una sesión previa — aparece un selector de cuenta en vez del flujo completo
+  const saved = loadSavedToken();
+  tokenClient.requestAccessToken({ prompt: saved ? '' : 'consent' });
 }
 
 function sheetsSignOut() {
@@ -55,6 +92,7 @@ function sheetsSignOut() {
     gapi.client.setToken('');
     isAuthorized = false;
   }
+  clearSavedToken();
 }
 
 // ─── Ensure sheet tabs exist ───────────────────────────────────────────────
@@ -89,7 +127,6 @@ async function sheetRead(spreadsheetId, sheetName) {
 
 async function sheetWrite(spreadsheetId, sheetName, rows) {
   try {
-    // Clear then write
     await gapi.client.sheets.spreadsheets.values.clear({ spreadsheetId, range: `${sheetName}!A:ZZ` });
     if (!rows.length) return;
     await gapi.client.sheets.spreadsheets.values.update({
@@ -128,9 +165,9 @@ function rowsToSummaries(rows) {
   return data.map(r => {
     const o = Object.fromEntries(h.map((k,i) => [k, r[i] ?? '']));
     o.ownExpenses = safeJSON(o.ownExpenses, []);
-    o.extensions = safeJSON(o.extensions, []);
-    o.minimo = Number(o.minimo) || 0;
-    o.total = Number(o.total) || 0;
+    o.extensions  = safeJSON(o.extensions, []);
+    o.minimo   = Number(o.minimo)   || 0;
+    o.total    = Number(o.total)    || 0;
     o.totalUSD = Number(o.totalUSD) || 0;
     return o;
   });
@@ -161,8 +198,7 @@ function extHoldersToRows(holders) {
 }
 function rowsToExtHolders(rows) {
   if (rows.length < 2) return [];
-  const [h, ...data] = rows;
-  return data.map(r => ({ id: r[0]||'', name: r[1]||'' }));
+  return rows.slice(1).map(r => ({ id: r[0]||'', name: r[1]||'' }));
 }
 
 function categoriesToRows(cats) {
@@ -215,7 +251,8 @@ async function pullFromSheets(spreadsheetId) {
       gastos:         rowsToGastos(gastos),
       gastosTerceros: rowsToGastosTer(gastosTer),
       extHolders:     rowsToExtHolders(extHolders),
-      categories:     rowsToCategories(categories).length ? rowsToCategories(categories)
+      categories:     rowsToCategories(categories).length
+                      ? rowsToCategories(categories)
                       : ['Supermercado','Restaurantes / Comida','Nafta / Transporte','Servicios','Salud','Ropa / Indumentaria','Entretenimiento','Viajes','Otros'],
     };
   } catch(e) { console.error('pullFromSheets error', e); return null; }
