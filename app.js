@@ -510,76 +510,104 @@ function resetDropZone(msg) {
     : '<div class="icon">&#8593;</div><div>Toca para subir imagen o PDF del resumen</div><div class="hint">JPG &middot; PNG &middot; PDF</div>';
 }
 
+function toBase64(bytes) {
+  var binary = '';
+  var chunkSize = 8192;
+  for (var i = 0; i < bytes.length; i += chunkSize) {
+    var chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+}
+
+async function decryptPDF(arrayBuf, password) {
+  // Send encrypted PDF to Cloudflare Worker for server-side decryption
+  // Worker returns extracted text pages which we send as text to Claude
+  var bytes = new Uint8Array(arrayBuf);
+  var binary = '';
+  var chunkSize = 8192;
+  for (var i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  var b64 = btoa(binary);
+
+  var resp = await fetch(PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Action': 'decrypt-pdf' },
+    body: JSON.stringify({ pdfBase64: b64, password: password })
+  });
+
+  var data = await resp.json();
+
+  if (data.error === 'wrong_password') {
+    throw new Error('wrong_password');
+  }
+  if (data.error) {
+    throw new Error(data.message || data.error);
+  }
+
+  // Return pages as text — will be sent to Claude as text content
+  return { type: 'text', pages: data.pages };
+}
+
 async function handleFile(inp) {
   var f = inp.files[0]; if (!f) return;
-  // Reset input so same file can be re-selected
   inp.value = '';
   uploadedFileType = f.type;
   var zone = document.getElementById('drop-zone');
-  zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">Listo para extraer</div>';
+  zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">Procesando...</div>';
 
   if (f.type !== 'application/pdf') {
-    // Image — just read as base64
     var r = new FileReader();
-    r.onload = function(e) { uploadedFileData = e.target.result.split(',')[1]; };
+    r.onload = function(e) {
+      uploadedFileData = e.target.result.split(',')[1];
+      zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">Listo para extraer</div>';
+    };
     r.readAsDataURL(f);
     return;
   }
 
-  // PDF — check if encrypted using pdfjs
   var arrayBuf = await f.arrayBuffer();
   var bytes = new Uint8Array(arrayBuf);
-  var text = new TextDecoder('latin1').decode(bytes.slice(0, 4096));
-  var isEncrypted = text.includes('/Encrypt');
+
+  // Check encryption: scan first 8KB for /Encrypt keyword
+  var header = '';
+  for (var i = 0; i < Math.min(bytes.length, 8192); i++) {
+    header += String.fromCharCode(bytes[i]);
+  }
+  var isEncrypted = header.indexOf('/Encrypt') !== -1;
 
   if (!isEncrypted) {
-    // Normal PDF
-    var base64 = btoa(bytes.reduce(function(d, b){ return d + String.fromCharCode(b); }, ''));
-    uploadedFileData = base64;
+    uploadedFileData = toBase64(bytes);
+    uploadedFileType = 'application/pdf';
+    zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">Listo para extraer</div>';
     return;
   }
 
-  // Encrypted — use pdfjs to render pages to canvas then rebuild PDF
-  zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">PDF protegido, solicitando contraseña...</div>';
+  // Encrypted PDF
+  zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">PDF protegido con contraseña</div>';
   var pwd = prompt('Este PDF tiene contraseña. Ingresala para continuar:');
   if (pwd === null) { resetDropZone('Cancelado'); return; }
 
+  zone.innerHTML = '<div class="icon">v</div><div>' + f.name + '</div><div class="hint">Desencriptando...</div>';
+
   try {
-    var pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-    if (!pdfjsLib) { throw new Error('pdf.js no cargado'); }
-    // Disable worker for CDN usage
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-
-    var loadingTask = pdfjsLib.getDocument({ data: arrayBuf, password: pwd, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
-    var pdfDoc = await loadingTask.promise;
-
-    // Render each page to canvas and collect image data
-    var pageImages = [];
-    for (var p = 1; p <= pdfDoc.numPages; p++) {
-      var page = await pdfDoc.getPage(p);
-      var viewport = page.getViewport({ scale: 2.0 });
-      var canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      var ctx = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-      pageImages.push(canvas.toDataURL('image/jpeg', 0.92).split(',')[1]);
-    }
-
-    // If single page, send as image; if multi-page, send first page as image
-    // and note in extraction
-    uploadedFileData = pageImages[0];
-    uploadedFileType = 'image/jpeg';
-    // If multi-page, combine all images by sending them together
-    if (pageImages.length > 1) {
-      window._allPageImages = pageImages;
-    }
-    zone.innerHTML = '<div class="icon">v</div><div>' + f.name + ' (' + pdfDoc.numPages + ' pag, desencriptado)</div><div class="hint">Listo para extraer</div>';
+    var result = await decryptPDF(arrayBuf, pwd);
+    // Store decrypted text pages for extraction
+    window._decryptedPages = result.pages;
+    uploadedFileData = null; // not sending raw PDF
+    uploadedFileType = 'text/plain';
+    zone.innerHTML = '<div class="icon">v</div><div>' + f.name + ' (' + result.pages.length + ' pág, desencriptado)</div><div class="hint">Listo para extraer</div>';
   } catch(e) {
-    var msg = e.message && e.message.toLowerCase().includes('password') ? 'Contrasena incorrecta. Intentalo de nuevo.' : 'No se pudo abrir el PDF: ' + e.message;
-    resetDropZone(msg);
+    var errMsg = e.message || '';
+    if (errMsg === 'wrong_password' || errMsg.toLowerCase().indexOf('password') !== -1) {
+      resetDropZone('Contraseña incorrecta. Tocá para intentar de nuevo.');
+    } else {
+      resetDropZone('Error al desencriptar: ' + errMsg);
+    }
   }
 }
+
 
 async function extractWithAI() {
   if (!uploadedFileData) { alert('Primero subi un archivo'); return; }
@@ -590,9 +618,15 @@ async function extractWithAI() {
   document.getElementById('confirm-btn').style.display = 'none';
 
   var userContent = [];
-  if (uploadedFileType && uploadedFileType.startsWith('image/')) {
-    // If multi-page PDF was converted to images, send all pages
-    var pages = (window._allPageImages && window._allPageImages.length > 1) ? window._allPageImages : [uploadedFileData];
+  if (window._decryptedPages && window._decryptedPages.length > 0) {
+    // PDF was decrypted server-side — send extracted text
+    var fullText = window._decryptedPages.join('\n\n--- pagina siguiente ---\n\n');
+    userContent.push({ type: 'text', text: 'Contenido del resumen de tarjeta (extraido de PDF):\n\n' + fullText });
+    window._decryptedPages = null;
+  } else if (uploadedFileType && uploadedFileType.startsWith('image/')) {
+    var pages = (window._allPageImages && window._allPageImages.length > 0)
+      ? window._allPageImages.slice(0, 5)
+      : [uploadedFileData];
     for (var pi = 0; pi < pages.length; pi++) {
       userContent.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: pages[pi] } });
     }
