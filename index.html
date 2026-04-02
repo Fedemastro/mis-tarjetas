@@ -478,6 +478,7 @@
 
 <!-- pdf-lib for password-protected PDFs -->
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>if(typeof pdfjsLib === "undefined" && typeof window["pdfjs-dist/build/pdf"] !== "undefined") { window.pdfjsLib = window["pdfjs-dist/build/pdf"]; }</script>
 
 <!-- Google APIs -->
 <script src="https://apis.google.com/js/api.js"></script>
