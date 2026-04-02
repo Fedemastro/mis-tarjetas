@@ -6,7 +6,8 @@ let db = {
   cards: [], extHolders: [], summaries: [],
   gastos: [], gastosTerceros: [],
   categories: ['Supermercado','Restaurantes / Comida','Nafta / Transporte','Servicios','Salud','Ropa / Indumentaria','Entretenimiento','Viajes','Otros'],
-  fxRate: 1200
+  fxRate: 1200,
+  payments: {}
 };
 
 let cfg = { clientId: '', apiKey: '', sheetId: '' };
@@ -171,76 +172,216 @@ function getPrevMonth(ym) {
 
 // --- Dashboard ---
 
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var target = new Date(dateStr + 'T00:00:00');
+  return Math.round((target - today) / 86400000);
+}
+
+function vencColor(days) {
+  if (days === null) return '';
+  if (days < 0)  return 'background:#fde8e8;border-left:3px solid var(--red)';
+  if (days <= 3) return 'background:#fde8e8;border-left:3px solid var(--red)';
+  if (days <= 7) return 'background:#fef3cd;border-left:3px solid var(--amber)';
+  return 'background:var(--surface2);border-left:3px solid var(--green)';
+}
+
+function vencLabel(days) {
+  if (days === null) return '';
+  if (days < 0)  return '<span style="color:var(--red);font-size:11px;font-weight:500">Vencido hace ' + Math.abs(days) + ' día' + (Math.abs(days)!==1?'s':'') + '</span>';
+  if (days === 0) return '<span style="color:var(--red);font-size:11px;font-weight:500">Vence HOY</span>';
+  if (days === 1) return '<span style="color:var(--red);font-size:11px;font-weight:500">Vence mañana</span>';
+  if (days <= 7)  return '<span style="color:var(--amber);font-size:11px;font-weight:500">Vence en ' + days + ' días</span>';
+  return '<span style="color:var(--green);font-size:11px">Vence en ' + days + ' días</span>';
+}
+
+var _newItems = [];
+
 function renderDashboard() {
-  const now = new Date();
-  const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  const lbl = document.getElementById('dash-month-label');
+  var now = new Date();
+  var ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  var lbl = document.getElementById('dash-month-label');
   if (lbl) lbl.textContent = new Date(ym + '-01').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-  const ms = db.summaries.filter(s => s.month === ym);
-  let totalARS = 0, totalMin = 0, totalUSD = 0, nextVenc = null;
-  ms.forEach(s => {
+  var ms = db.summaries.filter(function(s){ return s.month === ym; });
+  var totalARS = 0, totalMin = 0, totalUSD = 0, nextVenc = null, nextDays = null;
+  ms.forEach(function(s) {
     totalARS += Number(s.total || 0);
     totalMin += Number(s.minimo || 0);
     totalUSD += Number(s.totalUSD || 0);
-    if (s.vencimiento) { const d = new Date(s.vencimiento); if (!nextVenc || d < nextVenc) nextVenc = d; }
+    if (s.vencimiento) {
+      var d = new Date(s.vencimiento + 'T00:00:00');
+      if (!nextVenc || d < nextVenc) { nextVenc = d; nextDays = daysUntil(s.vencimiento); }
+    }
   });
   document.getElementById('d-total').textContent = '$' + fmt(totalARS);
   document.getElementById('d-min').textContent = '$' + fmt(totalMin);
   document.getElementById('d-usd').textContent = 'U$S ' + fmt(totalUSD);
-  document.getElementById('d-venc').textContent = nextVenc ? nextVenc.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) : '-';
+  var vencEl = document.getElementById('d-venc');
+  if (nextVenc) {
+    vencEl.innerHTML = nextVenc.toLocaleDateString('es-AR', { day:'2-digit', month:'short' }) +
+      '<div style="font-size:10px;margin-top:2px">' + (nextDays !== null ? vencLabel(nextDays).replace(/<[^>]+>/g,'') : '') + '</div>';
+    vencEl.style.color = nextDays !== null && nextDays <= 3 ? 'var(--red)' : nextDays <= 7 ? 'var(--amber)' : '';
+  } else {
+    vencEl.textContent = '-';
+  }
 
-  const dc = document.getElementById('dash-cards');
-  if (!ms.length) { dc.innerHTML = '<div class="empty">Sin datos para este mes</div>'; }
-  else {
-    dc.innerHTML = ms.map(s => {
-      const card = db.cards.find(c => c.id === s.cardId) || { name: s.cardName || 'Tarjeta', autoDebit: 'no' };
-      const extra = Number(s.total || 0) - Number(s.minimo || 0);
-      return '<div class="card-summary-item">' +
-        '<div>' +
-          '<div style="font-weight:500;font-size:13px;margin-bottom:3px">' + card.name + '</div>' +
-          '<div style="font-size:11px;color:var(--text2)">Vence: ' + fmtDate(s.vencimiento) + ' &nbsp;·&nbsp; Min: $' + fmt(s.minimo || 0) + '</div>' +
-          (card.autoDebit === 'yes' && extra > 0 ? '<div style="font-size:11px;color:var(--amber);margin-top:2px">Extra sobre minimo: $' + fmt(extra) + '</div>' : '') +
+  // Cards with payment input
+  var dc = document.getElementById('dash-cards');
+  if (!ms.length) {
+    dc.innerHTML = '<div class="empty">Sin datos para este mes</div>';
+  } else {
+    dc.innerHTML = ms.map(function(s) {
+      var card = db.cards.find(function(c){ return c.id === s.cardId; }) || { name: s.cardName || 'Tarjeta', autoDebit: 'no' };
+      var extra = Number(s.total || 0) - Number(s.minimo || 0);
+      var days = daysUntil(s.vencimiento);
+      var payment = db.payments && db.payments[s.id] ? db.payments[s.id] : {};
+      return '<div style="padding:10px 0 12px;border-bottom:1px solid var(--border);margin-bottom:2px">' +
+        '<div style="' + vencColor(days) + ';border-radius:6px;padding:8px 12px;margin-bottom:8px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+            '<div>' +
+              '<div style="font-weight:500;font-size:13px">' + card.name + '</div>' +
+              '<div style="font-size:11px;color:var(--text2);margin-top:2px">' +
+                vencLabel(days) + ' &nbsp;·&nbsp; ' + fmtDate(s.vencimiento) +
+              '</div>' +
+              '<div style="font-size:11px;color:var(--text2);margin-top:1px">Min: $' + fmt(s.minimo||0) + '</div>' +
+              (card.autoDebit === 'yes' && extra > 0 ? '<div style="font-size:11px;color:var(--amber);margin-top:1px">Extra sobre mínimo: $' + fmt(extra) + '</div>' : '') +
+            '</div>' +
+            '<div style="text-align:right">' +
+              '<div style="font-family:var(--mono);font-size:15px;font-weight:500">$' + fmt(s.total||0) + '</div>' +
+              (Number(s.totalUSD)>0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(s.totalUSD) + '</div>' : '') +
+              '<span class="badge ' + (card.autoDebit==='yes'?'amber':'blue') + '" style="margin-top:3px;display:inline-block;font-size:10px">' + (card.autoDebit==='yes'?'débito auto':'manual') + '</span>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
-        '<div style="text-align:right">' +
-          '<div style="font-family:var(--mono);font-size:14px;font-weight:500">$' + fmt(s.total || 0) + '</div>' +
-          (s.totalUSD > 0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(s.totalUSD) + '</div>' : '') +
-          '<span class="badge ' + (card.autoDebit === 'yes' ? 'amber' : 'blue') + '" style="margin-top:4px;display:inline-block">' + (card.autoDebit === 'yes' ? 'debito auto' : 'manual') + '</span>' +
+        '<div style="background:var(--surface2);border-radius:6px;padding:8px 10px">' +
+          '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Registrar pago</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+            '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--text2)">Pesos $</label>' +
+            '<input type="number" id="pay-ars-' + s.id + '" placeholder="0" value="' + (payment.ars||'') + '" style="width:120px;font-size:12px;padding:5px 8px" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)"></div>' +
+            '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--text2)">Dólares U$S</label>' +
+            '<input type="number" id="pay-usd-' + s.id + '" placeholder="0" value="' + (payment.usd||'') + '" style="width:100px;font-size:12px;padding:5px 8px" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)"></div>' +
+            '<div style="display:flex;flex-direction:column;gap:2px;padding-top:14px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">' +
+            '<input type="checkbox" id="pay-full-' + s.id + '" data-sid="' + s.id + '" data-total="' + s.total + '" data-usd="' + (s.totalUSD||0) + '" ' + (payment.full?'checked':'') + ' onchange="toggleFullPayment(this.dataset.sid,this.dataset.total,this.dataset.usd)">Pago total</label></div>' +
+            (payment.ars || payment.usd ? '<div style="padding-top:14px;font-size:11px;color:var(--green);font-weight:500">&#10003; Pagado</div>' : '') +
+          '</div>' +
         '</div>' +
       '</div>';
     }).join('');
   }
 
-  const de = document.getElementById('dash-ext');
-  let extData = {};
-  ms.forEach(s => (s.extensions || []).forEach(e => {
-    if (!extData[e.holder]) extData[e.holder] = 0;
-    extData[e.holder] += Number(e.total || 0);
-  }));
-  const extKeys = Object.keys(extData);
-  if (!extKeys.length) { de.innerHTML = '<div class="empty">Sin extensiones este mes</div>'; }
-  else {
-    de.innerHTML = extKeys.map(k =>
-      '<div class="ext-row"><span style="font-weight:500">' + k + '</span><span class="badge blue" style="font-family:var(--mono)">$' + fmt(extData[k]) + '</span></div>'
-    ).join('');
+  // Extensions
+  var de = document.getElementById('dash-ext');
+  var extData = {};
+  ms.forEach(function(s) {
+    (s.extensions||[]).forEach(function(e) {
+      if (!extData[e.holder]) extData[e.holder] = 0;
+      extData[e.holder] += Number(e.total||0);
+    });
+  });
+  var extKeys = Object.keys(extData);
+  if (!extKeys.length) {
+    de.innerHTML = '<div class="empty">Sin extensiones este mes</div>';
+  } else {
+    de.innerHTML = extKeys.map(function(k) {
+      return '<div class="ext-row"><span style="font-weight:500">' + k + '</span><span class="badge blue" style="font-family:var(--mono)">$' + fmt(extData[k]) + '</span></div>';
+    }).join('');
   }
 
-  const dn = document.getElementById('dash-new');
-  const prevYM = getPrevMonth(ym);
-  const prevDescs = new Set();
-  db.summaries.filter(s => s.month === prevYM).forEach(s => (s.ownExpenses || []).forEach(e => prevDescs.add(e.desc.toLowerCase().trim())));
-  const newItems = [];
-  ms.forEach(s => (s.ownExpenses || []).forEach(e => {
-    if (!prevDescs.has(e.desc.toLowerCase().trim())) newItems.push({ desc: e.desc, amount: e.amount, card: s.cardName || '' });
-  }));
-  if (!newItems.length) { dn.innerHTML = '<div class="empty">Sin gastos nuevos vs mes anterior</div>'; }
-  else {
-    dn.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Descripcion</th><th>Tarjeta</th><th>Monto</th></tr></thead><tbody>' +
-      newItems.slice(0, 10).map(i =>
-        '<tr><td>' + i.desc + ' <span class="badge new">nuevo</span></td><td style="color:var(--text2)">' + i.card + '</td><td class="num">$' + fmt(i.amount) + '</td></tr>'
-      ).join('') +
-      '</tbody></table></div>';
+  // New expenses — build list, keep collapsed
+  var prevYM = getPrevMonth(ym);
+  var prevDescs = {};
+  db.summaries.filter(function(s){ return s.month === prevYM; }).forEach(function(s) {
+    (s.ownExpenses||[]).forEach(function(e){ prevDescs[e.desc.toLowerCase().trim()] = true; });
+  });
+  _newItems = [];
+  ms.forEach(function(s) {
+    (s.ownExpenses||[]).forEach(function(e) {
+      if (!prevDescs[e.desc.toLowerCase().trim()]) {
+        _newItems.push({ desc: e.desc, amount: e.amount, currency: e.currency, card: s.cardName||'', cardId: s.cardId });
+      }
+    });
+  });
+
+  // Populate card filter for new expenses
+  var nfc = document.getElementById('new-filter-card');
+  if (nfc) {
+    var cardOpts = '<option value="">Todas las tarjetas</option>';
+    var seenCards = {};
+    _newItems.forEach(function(i){ if (!seenCards[i.cardId]) { seenCards[i.cardId]=true; cardOpts += '<option value="'+i.cardId+'">'+i.card+'</option>'; } });
+    nfc.innerHTML = cardOpts;
   }
+
+  renderNewExpenses(_newItems);
+  updateNewToggleBtn();
 }
+
+function updateNewToggleBtn() {
+  var btn = document.getElementById('new-toggle-btn');
+  var el = document.getElementById('dash-new');
+  if (!btn || !el) return;
+  var visible = el.style.display !== 'none';
+  btn.textContent = visible ? 'Ocultar' : 'Mostrar (' + _newItems.length + ')';
+}
+
+function toggleNewExpenses() {
+  var el = document.getElementById('dash-new');
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  updateNewToggleBtn();
+}
+
+function filterNewExpenses() {
+  var cardFilter = (document.getElementById('new-filter-card')||{}).value || '';
+  var filtered = cardFilter ? _newItems.filter(function(i){ return i.cardId === cardFilter; }) : _newItems;
+  renderNewExpenses(filtered);
+}
+
+function renderNewExpenses(items) {
+  var el = document.getElementById('dash-new');
+  if (!items.length) {
+    el.innerHTML = '<div class="empty">Sin gastos nuevos vs mes anterior</div>';
+    return;
+  }
+  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Descripción</th><th>Tarjeta</th><th>Monto</th></tr></thead><tbody>' +
+    items.slice(0, 20).map(function(i) {
+      var sym = i.currency === 'USD' ? 'U$S ' : '$';
+      return '<tr><td>' + i.desc + ' <span class="badge new" style="font-size:10px">nuevo</span></td>' +
+        '<td style="color:var(--text2)">' + i.card + '</td>' +
+        '<td class="num">' + sym + fmt(i.amount) + '</td></tr>';
+    }).join('') +
+    '</tbody></table></div>';
+}
+
+// --- Payments ---
+
+function savePayment(summaryId) {
+  if (!db.payments) db.payments = {};
+  var ars = document.getElementById('pay-ars-' + summaryId);
+  var usd = document.getElementById('pay-usd-' + summaryId);
+  var full = document.getElementById('pay-full-' + summaryId);
+  db.payments[summaryId] = {
+    ars: ars ? ars.value : '',
+    usd: usd ? usd.value : '',
+    full: full ? full.checked : false
+  };
+  saveAndSync();
+}
+
+function toggleFullPayment(summaryId, totalARS, totalUSD) {
+  var full = document.getElementById('pay-full-' + summaryId);
+  var arsEl = document.getElementById('pay-ars-' + summaryId);
+  var usdEl = document.getElementById('pay-usd-' + summaryId);
+  if (full && full.checked) {
+    if (arsEl) arsEl.value = totalARS;
+    if (usdEl) usdEl.value = Number(totalUSD) > 0 ? totalUSD : '';
+  } else {
+    if (arsEl) arsEl.value = '';
+    if (usdEl) usdEl.value = '';
+  }
+  savePayment(summaryId);
+}
+
 
 // --- Cards ---
 
