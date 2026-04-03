@@ -333,6 +333,7 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
           <div><div class="flbl">Tarjeta</div><select id="hf-card" onchange="renderHistorico()" style="width:190px"><option value="">Todas las tarjetas</option></select></div>
           <div><div class="flbl">Desde</div><input type="month" id="hf-from" onchange="renderHistorico()" style="width:155px"></div>
           <div><div class="flbl">Hasta</div><input type="month" id="hf-to" onchange="renderHistorico()" style="width:155px"></div>
+          <div style="flex:1;min-width:200px"><div class="flbl">Buscar concepto</div><input type="text" id="hf-search" oninput="renderHistorico()" placeholder="Ej: Netflix, Mercado..." style="width:100%"></div>
           <button class="btn sm" onclick="clearHistoricoFilters()" style="margin-bottom:1px">Limpiar</button>
         </div>
         <div id="historico-list"><div class="empty">Sin resúmenes cargados</div></div>
