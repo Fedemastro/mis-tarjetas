@@ -146,6 +146,7 @@ function nav(btn, sec) {
   if (sec === 'gastos')      { populateGastoCats(); populateGastoTerceroSelects(); renderGastos(); renderGastosTerceros(); }
   if (sec === 'categorias')  { renderCats(); renderCatSummary(); }
   if (sec === 'historico')   { populateHistoricoFilters(); renderHistorico(); }
+  if (sec === 'reportes')    { initReportes(); }
   if (sec === 'config')      updateConfigFields();
 }
 
@@ -1072,6 +1073,284 @@ function delSummary(id) {
   if (!confirm('Eliminar este resumen? Esta accion no se puede deshacer.')) return;
   db.summaries = db.summaries.filter(s => s.id !== id);
   saveAndSync(); renderHistorico();
+}
+
+
+// --- Reportes ---
+
+var _chartDonut = null;
+var _chartBarsCard = null;
+var _chartLine = null;
+var _chartStacked = null;
+var _chartCuotas = null;
+
+var CAT_COLORS = {
+  'Supermercado':        '#7367f0',
+  'Restaurantes / Comida': '#28c76f',
+  'Nafta / Transporte':  '#00cfe8',
+  'Servicios':           '#ff9f43',
+  'Salud':               '#ea5455',
+  'Ropa / Indumentaria': '#9e95f5',
+  'Entretenimiento':     '#ff6b9d',
+  'Viajes':              '#1de9b6',
+  'Otros':               '#a49fbf',
+};
+
+function destroyChart(c) { if (c) { try { c.destroy(); } catch(e) {} } return null; }
+
+function initReportes() {
+  var now = new Date();
+  var defaultYm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  var sel = document.getElementById('rep-month-sel');
+  if (sel && !sel.value) sel.value = defaultYm;
+  renderReportes();
+}
+
+function renderReportes() {
+  var sel = document.getElementById('rep-month-sel');
+  var now = new Date();
+  var ym = (sel && sel.value) ? sel.value : now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  var ms = db.summaries.filter(function(s){ return s.month === ym; });
+
+  renderDonut(ms, ym);
+  renderBarsCard(ms);
+  renderTop10(ms);
+  renderLine();
+  renderStacked();
+  renderCuotas();
+}
+
+function getAllExpenses(ms) {
+  var all = [];
+  ms.forEach(function(s) {
+    (s.ownExpenses || []).forEach(function(e) {
+      if (!e.isCredit && !e.c) all.push(e);
+    });
+  });
+  return all;
+}
+
+function renderDonut(ms, ym) {
+  var expenses = getAllExpenses(ms);
+  var bycat = {};
+  expenses.forEach(function(e) {
+    var cat = e.category || e.cat || 'Otros';
+    if (!bycat[cat]) bycat[cat] = 0;
+    bycat[cat] += Number(e.amount || e.a || 0);
+  });
+  var labels = Object.keys(bycat);
+  var data = labels.map(function(k){ return Math.round(bycat[k]); });
+  var colors = labels.map(function(k){ return CAT_COLORS[k] || '#c8c5d7'; });
+
+  _chartDonut = destroyChart(_chartDonut);
+  var ctx = document.getElementById('chart-donut');
+  if (!ctx) return;
+  if (!labels.length) { ctx.parentElement.innerHTML = '<div class="empty">Sin datos para este mes</div>'; return; }
+
+  _chartDonut = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 11, family: "'Public Sans'" }, boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: function(c) { return ' $' + c.raw.toLocaleString('es-AR'); } } }
+      }
+    }
+  });
+}
+
+function renderBarsCard(ms) {
+  var byCard = {};
+  ms.forEach(function(s) {
+    var name = s.cardName || 'Tarjeta';
+    var card = db.cards.find(function(c){ return c.id === s.cardId; });
+    if (card) name = card.name;
+    if (!byCard[name]) byCard[name] = 0;
+    byCard[name] += Number(s.total || 0);
+  });
+  var labels = Object.keys(byCard);
+  var data = labels.map(function(k){ return Math.round(byCard[k]); });
+
+  _chartBarsCard = destroyChart(_chartBarsCard);
+  var ctx = document.getElementById('chart-bars-card');
+  if (!ctx) return;
+  if (!labels.length) { ctx.parentElement.innerHTML = '<div class="empty">Sin datos para este mes</div>'; return; }
+
+  _chartBarsCard = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: '#7367f0', borderRadius: 6 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return ' $' + c.raw.toLocaleString('es-AR'); } } } },
+      scales: { x: { ticks: { callback: function(v){ return '$' + (v/1000).toFixed(0) + 'k'; }, font: { size: 11 } }, grid: { color: '#e9e7f0' } }, y: { ticks: { font: { size: 11, family: "'Public Sans'" } }, grid: { display: false } } }
+    }
+  });
+}
+
+function renderTop10(ms) {
+  var expenses = getAllExpenses(ms);
+  expenses.sort(function(a, b){ return Number(b.amount||b.a||0) - Number(a.amount||a.a||0); });
+  var top = expenses.slice(0, 10);
+  var el = document.getElementById('rep-top10');
+  if (!top.length) { el.innerHTML = '<div class="empty">Sin datos</div>'; return; }
+  var max = Number(top[0].amount || top[0].a || 0);
+  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>#</th><th>Descripción</th><th>Categoría</th><th style="text-align:right">Monto</th></tr></thead><tbody>' +
+    top.map(function(e, i) {
+      var amt = Number(e.amount || e.a || 0);
+      var cat = e.category || e.cat || 'Otros';
+      var pct = max > 0 ? Math.round((amt / max) * 100) : 0;
+      return '<tr>' +
+        '<td style="color:var(--text2);font-size:12px">' + (i+1) + '</td>' +
+        '<td><div style="font-weight:500;font-size:13px">' + (e.desc || e.d || '-') + '</div>' +
+          '<div class="pb" style="width:120px"><div class="pf" style="width:' + pct + '%;background:' + (CAT_COLORS[cat]||'#7367f0') + '"></div></div></td>' +
+        '<td><span class="tag">' + cat + '</span></td>' +
+        '<td class="num" style="text-align:right">$' + Math.round(amt).toLocaleString('es-AR') + '</td>' +
+      '</tr>';
+    }).join('') +
+  '</tbody></table></div>';
+}
+
+function renderLine() {
+  // Get all months with data, sorted
+  var monthSet = {};
+  db.summaries.forEach(function(s){ if (s.month) monthSet[s.month] = true; });
+  var months = Object.keys(monthSet).sort();
+  if (months.length < 2) {
+    var ctx = document.getElementById('chart-line');
+    if (ctx) ctx.parentElement.innerHTML = '<div class="empty">Se necesitan al menos 2 meses de datos</div>';
+    return;
+  }
+  var totals = months.map(function(m) {
+    return Math.round(db.summaries.filter(function(s){ return s.month === m; }).reduce(function(a, s){ return a + Number(s.total||0); }, 0));
+  });
+  var labels = months.map(function(m) {
+    return new Date(m + '-01').toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
+  });
+
+  _chartLine = destroyChart(_chartLine);
+  var ctx = document.getElementById('chart-line');
+  if (!ctx) return;
+
+  _chartLine = new Chart(ctx, {
+    type: 'line',
+    data: { labels: labels, datasets: [{ label: 'Total $', data: totals, borderColor: '#7367f0', backgroundColor: 'rgba(115,103,240,.1)', fill: true, tension: 0.4, pointBackgroundColor: '#7367f0', pointRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return ' $' + c.raw.toLocaleString('es-AR'); } } } },
+      scales: { x: { ticks: { font: { size: 11 } }, grid: { color: '#e9e7f0' } }, y: { ticks: { callback: function(v){ return '$' + (v/1000).toFixed(0) + 'k'; }, font: { size: 11 } }, grid: { color: '#e9e7f0' } } }
+    }
+  });
+}
+
+function renderStacked() {
+  var monthSet = {};
+  db.summaries.forEach(function(s){ if (s.month) monthSet[s.month] = true; });
+  var months = Object.keys(monthSet).sort();
+  if (months.length < 2) {
+    var ctx = document.getElementById('chart-stacked');
+    if (ctx) ctx.parentElement.innerHTML = '<div class="empty">Se necesitan al menos 2 meses de datos</div>';
+    return;
+  }
+
+  var cats = Object.keys(CAT_COLORS);
+  var datasets = cats.map(function(cat) {
+    return {
+      label: cat,
+      data: months.map(function(m) {
+        var ms2 = db.summaries.filter(function(s){ return s.month === m; });
+        var total = 0;
+        ms2.forEach(function(s) {
+          (s.ownExpenses||[]).forEach(function(e) {
+            if (!e.isCredit && !e.c && (e.category||e.cat||'Otros') === cat) {
+              total += Number(e.amount||e.a||0);
+            }
+          });
+        });
+        return Math.round(total);
+      }),
+      backgroundColor: CAT_COLORS[cat],
+      borderRadius: 3,
+      borderSkipped: false
+    };
+  }).filter(function(ds){ return ds.data.some(function(v){ return v > 0; }); });
+
+  var labels = months.map(function(m) {
+    return new Date(m + '-01').toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
+  });
+
+  _chartStacked = destroyChart(_chartStacked);
+  var ctx = document.getElementById('chart-stacked');
+  if (!ctx) return;
+
+  _chartStacked = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10, family: "'Public Sans'" }, boxWidth: 10, padding: 8 } }, tooltip: { callbacks: { label: function(c){ return ' ' + c.dataset.label + ': $' + c.raw.toLocaleString('es-AR'); } } } },
+      scales: { x: { stacked: true, ticks: { font: { size: 11 } }, grid: { display: false } }, y: { stacked: true, ticks: { callback: function(v){ return '$' + (v/1000).toFixed(0) + 'k'; }, font: { size: 11 } }, grid: { color: '#e9e7f0' } } }
+    }
+  });
+}
+
+function renderCuotas() {
+  // Project installments: for each expense with cuotas, calculate remaining payments per month
+  var now = new Date();
+  var futureMonths = [];
+  for (var i = 0; i < 12; i++) {
+    var d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    futureMonths.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  }
+
+  var projections = {};
+  futureMonths.forEach(function(m){ projections[m] = 0; });
+
+  db.summaries.forEach(function(s) {
+    (s.ownExpenses||[]).forEach(function(e) {
+      var cuotas = e.cuotas || e.q;
+      var cuotaActual = e.cuotaActual || e.qi;
+      var amount = Number(e.amount || e.a || 0);
+      if (!cuotas || !cuotaActual || cuotas <= 1) return;
+
+      var remaining = cuotas - cuotaActual;
+      if (remaining <= 0) return;
+
+      // Starting from next month relative to summary month
+      var summaryDate = new Date((s.month || s.uploadedAt || '').substring(0,7) + '-01');
+      for (var i = 1; i <= remaining; i++) {
+        var futureDate = new Date(summaryDate.getFullYear(), summaryDate.getMonth() + i, 1);
+        var futureYm = futureDate.getFullYear() + '-' + String(futureDate.getMonth()+1).padStart(2,'0');
+        if (projections[futureYm] !== undefined) {
+          projections[futureYm] += amount;
+        }
+      }
+    });
+  });
+
+  var labels = futureMonths.map(function(m) {
+    return new Date(m + '-01').toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
+  });
+  var data = futureMonths.map(function(m){ return Math.round(projections[m]); });
+
+  _chartCuotas = destroyChart(_chartCuotas);
+  var ctx = document.getElementById('chart-cuotas');
+  if (!ctx) return;
+
+  if (data.every(function(v){ return v === 0; })) {
+    ctx.parentElement.innerHTML = '<div class="empty">Sin consumos en cuotas registrados</div>';
+    return;
+  }
+
+  _chartCuotas = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ label: 'Cuotas pendientes $', data: data, backgroundColor: 'rgba(115,103,240,.7)', borderColor: '#7367f0', borderWidth: 1, borderRadius: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c){ return ' $' + c.raw.toLocaleString('es-AR'); } } } },
+      scales: { x: { ticks: { font: { size: 11 } }, grid: { display: false } }, y: { ticks: { callback: function(v){ return '$' + (v/1000).toFixed(0) + 'k'; }, font: { size: 11 } }, grid: { color: '#e9e7f0' } } }
+    }
+  });
 }
 
 // --- Config ---
