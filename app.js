@@ -8,12 +8,10 @@ let db = {
   cards: [], extHolders: [], summaries: [],
   gastos: [], gastosTerceros: [],
   categories: ['Supermercado','Restaurantes / Comida','Nafta / Transporte','Servicios','Salud','Ropa / Indumentaria','Entretenimiento','Viajes','Otros'],
-  fxRate: 1200,
+  fx: 1200,
   payments: {}
 };
 
-let cfg = { clientId: '', apiKey: '', sheetId: '' };
-let useSheets = false;
 let pendingExtraction = null;
 let manualExtCount = 0;
 let syncTimeout = null;
@@ -26,7 +24,6 @@ function loadLocal() {
   if (d) { try { const p = JSON.parse(d); db = { ...db, ...p }; } catch {} }
   if (!db.payments) db.payments = {};
 }
-function saveCfg() { localStorage.setItem('tarjetas_cfg', JSON.stringify(cfg)); }
 function loadCfg() {
   const d = localStorage.getItem('tarjetas_cfg');
   if (d) { try { cfg = { ...cfg, ...JSON.parse(d) }; } catch {} }
@@ -41,95 +38,78 @@ function setSyncStatus(state, label) {
   lbl.textContent = label;
 }
 
-async function saveAndSync() {
+function saveAndSync() {
   saveLocal();
-  if (!useSheets || !isAuthorized) return;
-  clearTimeout(syncTimeout);
-  syncTimeout = setTimeout(async () => {
-    setSyncStatus('syncing', 'sincronizando...');
-    const ok = await pushToSheets(cfg.sheetId, db);
-    setSyncStatus(ok ? 'ok' : 'error', ok ? 'sincronizado' : 'error de sync');
-  }, 800);
+  // Supabase writes happen explicitly in each action
 }
 
 async function manualSync() {
-  if (!useSheets || !isAuthorized) { alert('Conecta Google Sheets primero'); return; }
   setSyncStatus('syncing', 'sincronizando...');
   document.getElementById('sync-btn').disabled = true;
-  // Pull first to get remote data
-  const remote = await pullFromSheets(cfg.sheetId);
-  if (remote) {
-    // Merge remote into local (remote wins)
-    db = { ...db, ...remote };
-    saveLocal();
-    // Push back to update headers and any missing columns
-    await pushToSheets(cfg.sheetId, db);
-    // Repopulate all selects with updated data
+  try {
+    const remote = await loadAllData();
+    if (remote) {
+      db.cards          = remote.cards;
+      db.summaries      = remote.summaries;
+      db.payments       = remote.payments;
+      db.categories     = remote.categories;
+      db.extHolders     = remote.extHolders;
+      db.gastos         = remote.gastos;
+      db.gastosTerceros = remote.gastosTerceros;
+      db.fx             = remote.fx;
+      saveLocal();
+    }
     populateCardSelects();
     populateGastoCats();
     populateGastoTerceroSelects();
     renderCurrentSection();
     renderDashboard();
     setSyncStatus('ok', 'sincronizado');
-  } else {
-    // Nothing in Sheets yet — push everything
-    const ok = await pushToSheets(cfg.sheetId, db);
-    setSyncStatus(ok ? 'ok' : 'error', ok ? 'sincronizado' : 'error');
+  } catch(e) {
+    console.error('Sync error:', e);
+    setSyncStatus('error', 'error al sincronizar');
   }
   document.getElementById('sync-btn').disabled = false;
 }
 
 // --- Auth / init ---
 
-function initApp() {
-  const clientId = (document.getElementById('cfg-client-id').value.trim()) || cfg.clientId;
-  const apiKey   = (document.getElementById('cfg-api-key').value.trim())   || cfg.apiKey;
-  const sheetId  = (document.getElementById('cfg-sheet-id').value.trim())  || cfg.sheetId;
-  if (!clientId || !apiKey || !sheetId) { alert('Completa todos los campos'); return; }
-  cfg = { clientId, apiKey, sheetId };
-  saveCfg();
-  useSheets = true;
-  launchApp();
-}
-
-function useLocalOnly() {
-  useSheets = false;
-  launchApp();
-}
-
-function launchApp() {
-  loadLocal();
+async function launchApp() {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-
-  if (useSheets) {
-    setSyncStatus('syncing', 'conectando...');
-    sheetsInit(cfg.clientId, cfg.apiKey, (ok) => {
-      if (!ok) { setSyncStatus('error', 'error de config'); return; }
-      window._sheetsOnAuth = async () => {
-        setSyncStatus('syncing', 'cargando...');
-        const remote = await pullFromSheets(cfg.sheetId);
-        if (remote) { db = { ...db, ...remote }; saveLocal(); }
-        populateCardSelects();
-        populateGastoCats();
-        populateGastoTerceroSelects();
-        renderCats();
-        renderCurrentSection();
-        renderDashboard();
-        setSyncStatus('ok', 'sincronizado');
-      };
-      sheetsSignIn();
-    });
-  } else {
-    setSyncStatus('error', 'solo local');
+  setSyncStatus('syncing', 'cargando...');
+  try {
+    const remote = await loadAllData();
+    if (remote) {
+      db.cards          = remote.cards;
+      db.summaries      = remote.summaries;
+      db.payments       = remote.payments;
+      db.categories     = remote.categories;
+      db.extHolders     = remote.extHolders;
+      db.gastos         = remote.gastos;
+      db.gastosTerceros = remote.gastosTerceros;
+      db.fx             = remote.fx;
+      saveLocal();
+    }
+  } catch(e) {
+    console.warn('Error loading from Supabase:', e);
+  }
+  // Show account email
+  var emailEl = document.getElementById('account-email');
+  if (emailEl && typeof _supaUser !== 'undefined' && _supaUser && _supaUser.user) {
+    emailEl.textContent = _supaUser.user.email || '';
   }
 
+
+
   initDefaults();
-  renderCurrentSection();
   populateCardSelects();
   populateGastoCats();
   populateGastoTerceroSelects();
   renderCats();
+  renderCurrentSection();
+  renderDashboard();
+  setSyncStatus('ok', 'sincronizado');
   renderDashboard();
   updateConfigFields();
 }
@@ -143,7 +123,7 @@ function initDefaults() {
     if (el && el.type === 'month' && !el.value) el.value = ym;
   });
   ['ge-date','gt-date'].forEach(id => { const el = document.getElementById(id); if (el && !el.value) el.value = today; });
-  document.getElementById('fx-rate').value = db.fxRate || 1200;
+  document.getElementById('fx-rate').value = db.fx || 1200;
 }
 
 
@@ -515,14 +495,11 @@ function savePayment(summaryId) {
   var ars = document.getElementById('pay-ars-' + summaryId);
   var usd = document.getElementById('pay-usd-' + summaryId);
   var full = document.getElementById('pay-full-' + summaryId);
-  db.payments[summaryId] = {
-    ars: ars ? ars.value : '',
-    usd: usd ? usd.value : '',
-    full: full ? full.checked : false
-  };
-  saveAndSync();
-  // Update restante and estado in the same row without full re-render
+  var payment = { ars: ars ? ars.value : '', usd: usd ? usd.value : '', full: full ? full.checked : false };
+  db.payments[summaryId] = payment;
+  saveLocal();
   updatePaymentRow(summaryId);
+  savePaymentDB(summaryId, payment).catch(function(e){ console.warn('Payment save error:', e); });
 }
 
 function updatePaymentRow(summaryId) {
@@ -612,20 +589,27 @@ function toggleFullPayment(summaryId, totalARS, totalUSD) {
 
 // --- Cards ---
 
-function saveCard() {
+async function saveCard() {
   const name = document.getElementById('tc-name').value.trim();
   const bank = document.getElementById('tc-bank').value.trim();
   const type = document.getElementById('tc-type').value;
   const auto = document.getElementById('tc-auto').value;
   const editId = document.getElementById('tc-edit-id').value;
   if (!name) return;
-  if (editId) {
-    const c = db.cards.find(c => c.id === editId);
-    if (c) { c.name = name; c.bank = bank; c.type = type; c.autoDebit = auto; }
-  } else {
-    db.cards.push({ id: 'c' + Date.now(), name, bank, type, autoDebit: auto });
-  }
-  saveAndSync(); renderCards(); populateCardSelects(); cancelEditCard();
+  try {
+    if (editId) {
+      // Update existing
+      const c = db.cards.find(c => c.id === editId);
+      if (c) { c.name = name; c.bank = bank; c.type = type; c.autoDebit = auto; }
+      await supaPatch('cards', 'id=eq.' + editId, { name, bank, type: type, auto_debit: auto === 'yes' });
+    } else {
+      // Insert new — Supabase generates the UUID
+      const res = await supaPost('cards', { user_id: currentUserId(), name, bank, type: type, auto_debit: auto === 'yes' });
+      const newId = res[0].id;
+      db.cards.push({ id: newId, name, bank, type, autoDebit: auto });
+    }
+    saveLocal(); renderCards(); populateCardSelects(); cancelEditCard();
+  } catch(e) { alert('Error guardando tarjeta: ' + e.message); }
 }
 
 function editCard(id) {
@@ -693,12 +677,15 @@ function populateCardSelects() {
 
 // --- Extension holders ---
 
-function addExtHolder() {
+async function addExtHolder() {
   const n = document.getElementById('ext-name').value.trim();
   if (!n) return;
-  db.extHolders.push({ id: 'h' + Date.now(), name: n });
-  saveAndSync(); renderExtHolders(); populateGastoTerceroSelects();
-  document.getElementById('ext-name').value = '';
+  try {
+    const res = await supaPost('ext_holders', { user_id: currentUserId(), name: n });
+    db.extHolders.push({ id: res[0].id, name: n });
+    saveLocal(); renderExtHolders(); populateGastoTerceroSelects();
+    document.getElementById('ext-name').value = '';
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 function renderExtHolders() {
@@ -742,19 +729,20 @@ function populateGastoCats() {
   const gf = document.getElementById('gf-cat'); if (gf) gf.innerHTML = filterOpts;
 }
 
-function addGasto() {
+async function addGasto() {
   const desc = document.getElementById('ge-desc').value.trim();
   const amount = document.getElementById('ge-amount').value;
+  const cat = document.getElementById('ge-cat').value;
+  const date = document.getElementById('ge-date').value;
+  const currency = document.getElementById('ge-curr').value;
+  const month = document.getElementById('ge-month').value;
   if (!desc || !amount) return;
-  db.gastos.push({
-    id: 'g' + Date.now(), desc, amount: Number(amount),
-    cat: document.getElementById('ge-cat').value,
-    date: document.getElementById('ge-date').value,
-    currency: document.getElementById('ge-curr').value,
-    month: document.getElementById('ge-month').value
-  });
-  saveAndSync(); renderGastos();
-  document.getElementById('ge-desc').value = ''; document.getElementById('ge-amount').value = '';
+  try {
+    const res = await supaPost('gastos_extra', { user_id: currentUserId(), description: desc, amount: Number(amount), category: cat, date: date || null, currency, month });
+    db.gastos.push({ id: res[0].id, desc, amount: Number(amount), cat, date, currency, month });
+    saveLocal(); renderGastos();
+    document.getElementById('ge-desc').value = ''; document.getElementById('ge-amount').value = '';
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 function renderGastos() {
@@ -1050,7 +1038,7 @@ async function extractWithAI() {
   btn.disabled = false;
 }
 
-function confirmExtraction() {
+async function confirmExtraction() {
   if (!pendingExtraction) return;
   const cardId = document.getElementById('upload-card').value;
   const month  = document.getElementById('upload-month').value;
@@ -1077,50 +1065,33 @@ function confirmExtraction() {
       items: (ext.items || []).map(mapExpense)
     };
   }
-  var summaryId = 's' + Date.now();
+  var expenses = (p.ownExpenses || []).map(mapExpense);
+  var exts     = (p.extensions || []).map(mapExtension);
   var summaryObj = {
-    id: summaryId, cardId, uploadedAt: new Date().toISOString(),
+    id: null, cardId, uploadedAt: new Date().toISOString(),
     cardName: card ? card.name : (p.cardName || 'Tarjeta'),
     month, vencimiento: p.vencimiento || '',
-    minimo: Number(p.minimo || 0),
-    total: Number(p.total || 0),
-    totalUSD: Number(p.totalUSD || 0),
-    ownExpenses: (p.ownExpenses || []).map(mapExpense),
-    extensions: (p.extensions || []).map(mapExtension),
-    driveFileId: null,
-    driveLink: null
+    minimo: Number(p.minimo || 0), total: Number(p.total || 0), totalUSD: Number(p.totalUSD || 0),
+    driveFileId: null, driveLink: null, ownExpenses: expenses, extensions: exts
   };
-  db.summaries.push(summaryObj);
-  saveAndSync();
-  pendingExtraction = null;
-  document.getElementById('ai-output').textContent = 'Guardado. Subiendo archivo a Drive...';
+
+  document.getElementById('ai-output').textContent = 'Guardando...';
   document.getElementById('confirm-btn').style.display = 'none';
+  pendingExtraction = null;
 
-  // Upload original file to Drive in background
-  if (useSheets && isAuthorized && uploadedFileData) {
-    var cardNameSafe = (summaryObj.cardName || 'tarjeta').replace(/[^a-zA-Z0-9\s]/g, '').trim();
-    var fileName = cardNameSafe + ' - ' + month + '.' + (uploadedFileType === 'application/pdf' ? 'pdf' : 'jpg');
-    var folderPath = month;
-    uploadToDrive(fileName, uploadedFileData, uploadedFileType || 'application/pdf', folderPath)
-      .then(function(result) {
-        if (result) {
-          summaryObj.driveFileId = result.id;
-          summaryObj.driveLink = result.link;
-          // Update the summary in db
-          var idx = db.summaries.findIndex(function(s){ return s.id === summaryId; });
-          if (idx !== -1) db.summaries[idx] = summaryObj;
-          saveAndSync();
-          document.getElementById('ai-output').textContent = 'Guardado y subido a Drive correctamente.';
-        } else {
-          document.getElementById('ai-output').textContent = 'Guardado. No se pudo subir a Drive.';
-        }
-      });
-  } else {
+  try {
+    var newId = await saveSummary(summaryObj, expenses, exts);
+    summaryObj.id = newId;
+    db.summaries.push(summaryObj);
+    saveLocal();
     document.getElementById('ai-output').textContent = 'Guardado correctamente.';
+    resetDropZone();
+    renderDashboard();
+    populateHistoricoFilters();
+  } catch(e) {
+    document.getElementById('ai-output').textContent = 'Error al guardar: ' + e.message;
+    document.getElementById('confirm-btn').style.display = 'inline-flex';
   }
-
-  resetDropZone();
-  renderDashboard();
 }
 
 function addManualExt() {
@@ -1135,7 +1106,7 @@ function addManualExt() {
   list.appendChild(div);
 }
 
-function saveManual() {
+async function saveManual() {
   const cardId = document.getElementById('m-card').value;
   const month  = document.getElementById('m-month').value;
   if (!cardId || !month) { alert('Selecciona tarjeta y mes'); return; }
@@ -1146,17 +1117,21 @@ function saveManual() {
     const tot = document.getElementById(base + '-total');
     if (inp.value.trim()) exts.push({ holder: inp.value.trim(), total: Number(tot ? tot.value : 0), items: [] });
   });
-  db.summaries.push({
-    id: 's' + Date.now(), cardId, cardName: card.name, uploadedAt: new Date().toISOString(), month,
+  const summaryObj = {
+    id: null, cardId, cardName: card.name, uploadedAt: new Date().toISOString(), month,
     vencimiento: document.getElementById('m-venc').value,
     minimo: Number(document.getElementById('m-min').value || 0),
     total: Number(document.getElementById('m-total').value || 0),
     totalUSD: Number(document.getElementById('m-usd').value || 0),
     ownExpenses: [], extensions: exts
-  });
-  saveAndSync();
-  alert('Guardado correctamente');
-  renderDashboard();
+  };
+  try {
+    const newId = await saveSummary(summaryObj, [], exts);
+    summaryObj.id = newId;
+    db.summaries.push(summaryObj);
+    saveLocal(); renderDashboard();
+    alert('Guardado correctamente');
+  } catch(e) { alert('Error al guardar: ' + e.message); }
 }
 
 
@@ -1342,7 +1317,8 @@ function updateExpenseCategory(summaryId, expenseIndex, newCategory) {
   var s = db.summaries.find(function(x){ return x.id === summaryId; });
   if (!s || !s.ownExpenses || !s.ownExpenses[expenseIndex]) return;
   s.ownExpenses[expenseIndex].category = newCategory;
-  saveAndSync();
+  saveLocal();
+  updateExpenseCategoryDB(summaryId, expenseIndex, newCategory).catch(function(e){ console.warn('Cat update error:', e); });
 }
 
 function editSummary(id) {
@@ -1418,25 +1394,19 @@ function saveSummaryEdit(id) {
   s.minimo   = Number(document.getElementById('ep-min-' + id).value) || 0;
   s.totalUSD = Number(document.getElementById('ep-usd-' + id).value) || 0;
 
-  saveAndSync();
+  saveLocal();
   var panel = document.getElementById('edit-panel-' + id);
   if (panel) panel.remove();
   renderHistorico();
   renderDashboard();
+  updateSummaryFields(id, { cardId: s.cardId, cardName: s.cardName, month: s.month, vencimiento: s.vencimiento, total: s.total, minimo: s.minimo, totalUSD: s.totalUSD }).catch(function(e){ console.warn('Edit save error:', e); });
 }
 
-function delSummary(id) {
-  if (!confirm('Eliminar este resumen? Esta accion no se puede deshacer.')) return;
-  var summary = db.summaries.find(function(s){ return s.id === id; });
+async function delSummary(id) {
+  if (!confirm('Eliminar este resumen?')) return;
   db.summaries = db.summaries.filter(function(s){ return s.id !== id; });
-  saveAndSync();
-  // Move Drive file to trash if exists
-  if (summary && summary.driveFileId && useSheets && isAuthorized) {
-    moveToTrashDrive(summary.driveFileId).then(function(ok) {
-      if (!ok) console.warn('No se pudo mover a la papelera de Drive el archivo:', summary.driveFileId);
-    });
-  }
-  renderHistorico();
+  saveLocal(); renderHistorico(); renderDashboard();
+  try { await deleteSummaryDB(id); } catch(e) { console.warn('Error deleting summary:', e); }
 }
 
 
@@ -1722,30 +1692,17 @@ function renderCuotas() {
 // --- Config ---
 
 function updateConfigFields() {
-  const el1 = document.getElementById('cfg-client-id2');
-  const el2 = document.getElementById('cfg-api-key2');
-  const el3 = document.getElementById('cfg-sheet-id2');
-  const el4 = document.getElementById('fx-rate');
-  const el5 = document.getElementById('sheets-status');
-  if (el1) el1.value = cfg.clientId || '';
-  if (el2) el2.value = cfg.apiKey   || '';
-  if (el3) el3.value = cfg.sheetId  || '';
-  if (el4) el4.value = db.fxRate || 1200;
-  if (el5) {
-    el5.textContent = isAuthorized ? 'conectado' : 'desconectado';
-    el5.className = 'sheet-status ' + (isAuthorized ? 'ok' : 'err');
+  var fxEl = document.getElementById('fx-rate');
+  if (fxEl) fxEl.value = db.fx || 1200;
+  var emailEl = document.getElementById('account-email');
+  if (emailEl && typeof _supaUser !== 'undefined' && _supaUser && _supaUser.user) {
+    emailEl.textContent = _supaUser.user.email || '';
   }
 }
 
-function saveConfig() {
-  cfg.clientId = document.getElementById('cfg-client-id2').value.trim();
-  cfg.apiKey   = document.getElementById('cfg-api-key2').value.trim();
-  cfg.sheetId  = document.getElementById('cfg-sheet-id2').value.trim();
-  saveCfg();
-  alert('Configuracion guardada. Recarga la pagina para reconectar.');
-}
+function saveConfig() {}
 
-function saveFX() { db.fxRate = Number(document.getElementById('fx-rate').value) || 1200; saveAndSync(); }
+function saveFX() { db.fx = Number(document.getElementById('fx-rate').value) || 1200; saveAndSync(); }
 
 function exportToJSON() {
   const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
@@ -1775,20 +1732,75 @@ function clearAll() {
   saveAndSync(); renderDashboard();
 }
 
-// --- Boot ---
+// --- Boot & Auth ---
 
-loadCfg();
-if (cfg.clientId && cfg.apiKey && cfg.sheetId) {
-  // Config guardada: lanzar app directamente sin mostrar pantalla de login
-  useSheets = true;
-  document.addEventListener('DOMContentLoaded', function() {
-    launchApp();
-  });
-} else {
-  // Sin config: mostrar pantalla de login con campos vacios
-  document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('cfg-client-id').value = '';
-    document.getElementById('cfg-api-key').value   = '';
-    document.getElementById('cfg-sheet-id').value  = '';
-  });
+async function initAuth() {
+  setSyncStatus('syncing', 'conectando...');
+  const session = await restoreSession();
+  if (session) {
+    await launchApp();
+  } else {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    setSyncStatus('ok', '');
+  }
 }
+
+async function doLogin() {
+  var email = document.getElementById('login-email').value.trim();
+  var pass  = document.getElementById('login-pass').value;
+  var errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!email || !pass) { errEl.textContent = 'Completá email y contraseña'; errEl.style.display = 'block'; return; }
+  try {
+    await signIn(email, pass);
+    await launchApp();
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  }
+}
+
+async function doSignup() {
+  var email = document.getElementById('signup-email').value.trim();
+  var pass  = document.getElementById('signup-pass').value;
+  var errEl = document.getElementById('signup-error');
+  var okEl  = document.getElementById('signup-ok');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+  if (!email || !pass) { errEl.textContent = 'Completá todos los campos'; errEl.style.display = 'block'; return; }
+  try {
+    await signUp(email, pass);
+    okEl.style.display = 'block';
+  } catch(e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  }
+}
+
+async function doLogout() {
+  try { await signOut(); } catch(e) { console.warn('signOut error:', e); }
+  // Reset db to empty state
+  db = {
+    cards: [], extHolders: [], summaries: [],
+    gastos: [], gastosTerceros: [],
+    categories: ['Supermercado','Restaurantes / Comida','Nafta / Transporte','Servicios','Salud','Indumentaria','Entretenimiento','Viajes','Educación','Otros'],
+    fx: 1200, payments: {}
+  };
+  localStorage.removeItem('tarjetas_db');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  // Reset login form
+  var loginEmail = document.getElementById('login-email');
+  var loginPass = document.getElementById('login-pass');
+  if (loginEmail) loginEmail.value = '';
+  if (loginPass) loginPass.value = '';
+}
+
+function authTab(tab) {
+  document.getElementById('auth-login').style.display  = tab === 'login'  ? 'block' : 'none';
+  document.getElementById('auth-signup').style.display = tab === 'signup' ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',  tab === 'login');
+  document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  initAuth();
+});
