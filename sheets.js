@@ -239,17 +239,50 @@ function rowsToCards(rows) {
   return data.map(r => Object.fromEntries(h.map((k,i) => [k, r[i] ?? ''])));
 }
 
+function compressExpenses(expenses) {
+  // Store only essential fields using compact keys to stay within Sheets 50k char limit
+  return (expenses || []).map(function(e) {
+    var c = {
+      d: (e.desc || e.d || '').substring(0, 30),
+      a: e.amount || e.a || 0,
+      cu: e.currency || e.cu || 'ARS',
+      cat: (e.category || e.cat || 'Otros').substring(0, 20),
+      dt: e.date || e.dt || ''
+    };
+    if (e.isCredit || e.c) c.cr = 1;
+    if (e.cuotas || e.q) { c.q = e.cuotas || e.q; c.qi = e.cuotaActual || e.qi || 1; }
+    return c;
+  });
+}
+
+function compressExtensions(extensions) {
+  return (extensions || []).map(function(ext) {
+    return {
+      holder: ext.holder || '',
+      total: ext.total || 0,
+      totalUSD: ext.totalUSD || 0,
+      items: compressExpenses(ext.items || [])
+    };
+  });
+}
+
 function summariesToRows(summaries) {
   const h = ['id','cardId','cardName','month','vencimiento','minimo','total','totalUSD','ownExpenses','extensions','uploadedAt','driveFileId','driveLink'];
-  return [h, ...summaries.map(s => [
-    s.id, s.cardId, s.cardName, s.month, s.vencimiento,
-    s.minimo, s.total, s.totalUSD,
-    JSON.stringify(s.ownExpenses || []),
-    JSON.stringify(s.extensions || []),
-    s.uploadedAt || '',
-    s.driveFileId || '',
-    s.driveLink || ''
-  ])];
+  return [h, ...summaries.map(s => {
+    var exp = JSON.stringify(compressExpenses(s.ownExpenses));
+    var ext = JSON.stringify(compressExtensions(s.extensions));
+    // Truncate if still too long (Sheets limit ~50k chars per cell)
+    if (exp.length > 45000) exp = exp.substring(0, 45000) + '...truncated]';
+    if (ext.length > 45000) ext = ext.substring(0, 45000) + '...truncated]';
+    return [
+      s.id, s.cardId, s.cardName, s.month, s.vencimiento,
+      s.minimo, s.total, s.totalUSD,
+      exp, ext,
+      s.uploadedAt || '',
+      s.driveFileId || '',
+      s.driveLink || ''
+    ];
+  })];
 }
 function rowsToSummaries(rows) {
   if (rows.length < 2) return [];
