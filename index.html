@@ -176,6 +176,7 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
     <button onclick="nav(this,'gastos')">$ Gastos extra</button>
     <button onclick="nav(this,'categorias')">◉ Categorías</button>
     <button onclick="nav(this,'historico')">☰ Histórico</button>
+    <button onclick="nav(this,'reportes')">📊 Reportes</button>
     <button onclick="nav(this,'config')">⚙ Config</button>
   </nav>
 
@@ -408,6 +409,61 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
       </div>
     </div>
 
+
+    <!-- REPORTES -->
+    <div class="section" id="s-reportes">
+      <div class="ph" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div><div class="pt">Reportes</div><div class="ps">Análisis de gastos</div></div>
+        <input type="month" id="rep-month-sel" onchange="renderReportes()" style="width:160px;font-size:13px">
+      </div>
+
+      <!-- Row 1: Donut + Barras por tarjeta -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">
+        <div class="vc">
+          <div class="vct" style="margin-bottom:1rem">Gastos por categoría</div>
+          <div style="position:relative;height:260px;display:flex;align-items:center;justify-content:center">
+            <canvas id="chart-donut"></canvas>
+          </div>
+        </div>
+        <div class="vc">
+          <div class="vct" style="margin-bottom:1rem">Total por tarjeta</div>
+          <div style="position:relative;height:260px">
+            <canvas id="chart-bars-card"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Top gastos -->
+      <div class="vc" style="margin-bottom:1.25rem">
+        <div class="vct" style="margin-bottom:1rem">Top 10 gastos del mes</div>
+        <div id="rep-top10"><div class="empty">Sin datos</div></div>
+      </div>
+
+      <!-- Row 3: Línea evolución -->
+      <div class="vc" style="margin-bottom:1.25rem">
+        <div class="vct" style="margin-bottom:1rem">Evolución mensual del gasto total</div>
+        <div style="position:relative;height:220px">
+          <canvas id="chart-line"></canvas>
+        </div>
+      </div>
+
+      <!-- Row 4: Barras apiladas por categoría -->
+      <div class="vc" style="margin-bottom:1.25rem">
+        <div class="vct" style="margin-bottom:1rem">Evolución por categoría</div>
+        <div style="position:relative;height:240px">
+          <canvas id="chart-stacked"></canvas>
+        </div>
+      </div>
+
+      <!-- Row 5: Proyección cuotas -->
+      <div class="vc">
+        <div class="vct" style="margin-bottom:1rem">Proyección de cuotas pendientes</div>
+        <div style="position:relative;height:220px">
+          <canvas id="chart-cuotas"></canvas>
+        </div>
+      </div>
+    </div>
+
     <!-- CONFIG -->
     <div class="section" id="s-config">
       <div class="ph"><div class="pt">Configuración</div></div>
@@ -444,6 +500,7 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>if(window.pdfjsLib){window.pdfjsLib.GlobalWorkerOptions.workerSrc='';}</script>
 <script src="https://apis.google.com/js/api.js"></script>
 <script src="https://accounts.google.com/gsi/client"></script>
