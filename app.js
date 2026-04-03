@@ -136,6 +136,26 @@ function initDefaults() {
   document.getElementById('fx-rate').value = db.fxRate || 1200;
 }
 
+
+function cfgTab(btn, tabId) {
+  document.querySelectorAll('.cfg-tab').forEach(function(b) {
+    b.style.borderBottomColor = 'transparent';
+    b.style.color = 'var(--text2)';
+    b.style.fontWeight = '400';
+  });
+  btn.style.borderBottomColor = 'var(--purple)';
+  btn.style.color = 'var(--purple)';
+  btn.style.fontWeight = '500';
+  ['cfg-general','cfg-tarjetas','cfg-extensiones','cfg-categorias'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = id === tabId ? 'block' : 'none';
+  });
+  // Render relevant content
+  if (tabId === 'cfg-tarjetas') renderCards();
+  if (tabId === 'cfg-extensiones') { renderExtHolders(); renderExtSummary(); }
+  if (tabId === 'cfg-categorias') { renderCats(); renderCatSummary(); }
+}
+
 // --- Navigation ---
 
 let currentSection = 'dashboard';
@@ -146,13 +166,15 @@ function nav(btn, sec) {
   document.getElementById('s-' + sec).classList.add('active');
   currentSection = sec;
   if (sec === 'dashboard')   renderDashboard();
-  if (sec === 'tarjetas')    renderCards();
-  if (sec === 'extensiones') { renderExtHolders(); renderExtSummary(); }
   if (sec === 'gastos')      { populateGastoCats(); populateGastoTerceroSelects(); renderGastos(); renderGastosTerceros(); }
-  if (sec === 'categorias')  { renderCats(); renderCatSummary(); }
   if (sec === 'historico')   { populateHistoricoFilters(); renderHistorico(); }
   if (sec === 'reportes')    { initReportes(); }
-  if (sec === 'config')      updateConfigFields();
+  if (sec === 'config') {
+    updateConfigFields();
+    // Reset to General tab
+    var firstTab = document.querySelector('.cfg-tab');
+    if (firstTab) cfgTab(firstTab, 'cfg-general');
+  }
 }
 
 function renderCurrentSection() {
