@@ -254,15 +254,23 @@ function summariesToRows(summaries) {
 function rowsToSummaries(rows) {
   if (rows.length < 2) return [];
   const [h, ...data] = rows;
-  return data.map(r => {
-    const o = Object.fromEntries(h.map((k,i) => [k, r[i] ?? '']));
-    o.ownExpenses = safeJSON(o.ownExpenses, []);
-    o.extensions  = safeJSON(o.extensions, []);
-    o.minimo   = Number(o.minimo)   || 0;
-    o.total    = Number(o.total)    || 0;
-    o.totalUSD = Number(o.totalUSD) || 0;
-    return o;
-  });
+  const results = [];
+  for (const r of data) {
+    try {
+      const o = Object.fromEntries(h.map((k,i) => [k, r[i] ?? '']));
+      o.ownExpenses = safeJSON(o.ownExpenses, []);
+      o.extensions  = safeJSON(o.extensions, []);
+      o.minimo   = Number(o.minimo)   || 0;
+      o.total    = Number(o.total)    || 0;
+      o.totalUSD = Number(o.totalUSD) || 0;
+      o.driveFileId = o.driveFileId || null;
+      o.driveLink   = o.driveLink   || null;
+      if (o.id) results.push(o);
+    } catch(e) {
+      console.warn('Error parsing summary row:', r, e);
+    }
+  }
+  return results;
 }
 
 function gastosToRows(gastos) {
