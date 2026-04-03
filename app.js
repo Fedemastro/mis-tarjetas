@@ -284,6 +284,32 @@ function renderDashboard() {
   document.getElementById('d-total').textContent = '$' + fmt(totalARS);
   document.getElementById('d-min').textContent = '$' + fmt(totalMin);
   document.getElementById('d-usd').textContent = 'U$S ' + fmt(totalUSD);
+
+  // Calculate total pending (sum of restantes)
+  var totalPending = 0;
+  ms.forEach(function(s) {
+    var payment = (db.payments && db.payments[s.id]) ? db.payments[s.id] : {};
+    var paidARS = Number(payment.ars || 0);
+    var sTotal = Number(s.total || 0);
+    var isPaidFull = payment.full || paidARS >= sTotal;
+    if (!isPaidFull) totalPending += Math.max(0, sTotal - paidARS);
+  });
+  var pendEl = document.getElementById('d-pending');
+  if (pendEl) pendEl.textContent = '$' + fmt(totalPending);
+
+  // Calculate total pending (sum of restantes)
+  var totalPendiente = 0;
+  ms.forEach(function(s) {
+    var payment = (db.payments && db.payments[s.id]) ? db.payments[s.id] : {};
+    var paidARS = Number(payment.ars || 0);
+    var sTotal = Number(s.total || 0);
+    var sTotalUSD = Number(s.totalUSD || 0);
+    var sPaidUSD = Number(payment.usd || 0);
+    var sIsPaid = payment.full || (paidARS >= sTotal && (sTotalUSD === 0 || sPaidUSD >= sTotalUSD));
+    if (!sIsPaid) totalPendiente += Math.max(0, sTotal - paidARS);
+  });
+  var pendEl = document.getElementById('d-pendiente');
+  if (pendEl) pendEl.textContent = '$' + fmt(totalPendiente);
   var vencEl = document.getElementById('d-venc');
   if (nextVenc) {
     vencEl.innerHTML = nextVenc.toLocaleDateString('es-AR', { day:'2-digit', month:'short' }) +
@@ -370,11 +396,17 @@ function renderDashboard() {
     if (!extData[g.holder]) extData[g.holder] = { fromSummary: 0, fromManual: 0 };
     extData[g.holder].fromManual += Number(g.amount||0);
   });
-  // Only show holders that are explicitly registered in extHolders
+  // Show holders from: registered extHolders + gastosTerceros holders for this month
   var registeredHolders = db.extHolders.map(function(h){ return (h.name||'').toLowerCase().trim(); }).filter(Boolean);
-  var extKeys = registeredHolders.length > 0
+  // Also include anyone who has manual gastosTerceros this month
+  var manualHolders = (db.gastosTerceros||[])
+    .filter(function(g){ return g.month === ym2; })
+    .map(function(g){ return (g.holder||'').toLowerCase().trim(); })
+    .filter(Boolean);
+  var allHolders = registeredHolders.concat(manualHolders.filter(function(h){ return registeredHolders.indexOf(h) === -1; }));
+  var extKeys = allHolders.length > 0
     ? Object.keys(extData).filter(function(k) {
-        return registeredHolders.indexOf((k||'').toLowerCase().trim()) !== -1;
+        return allHolders.indexOf((k||'').toLowerCase().trim()) !== -1;
       })
     : Object.keys(extData);
   var extBtn = document.getElementById('dash-ext-btn');
