@@ -340,7 +340,7 @@ function renderDashboard() {
       '</tr>';
     }).join('');
     dc.innerHTML = '<div class="table-wrap"><table>' +
-      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th><th>Restante</th><th>Estado</th><th>Pago</th></tr></thead>' +
+      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th><th>Estado</th><th>Pago</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div>';
   }
 
@@ -472,6 +472,77 @@ function savePayment(summaryId) {
     full: full ? full.checked : false
   };
   saveAndSync();
+  // Update restante and estado in the same row without full re-render
+  updatePaymentRow(summaryId);
+}
+
+function updatePaymentRow(summaryId) {
+  var s = db.summaries.find(function(x){ return x.id === summaryId; });
+  if (!s) return;
+  var payment = db.payments[summaryId] || {};
+  var paidARS = Number(payment.ars || 0);
+  var paidUSD = Number(payment.usd || 0);
+  var totalARS = Number(s.total || 0);
+  var totalUSD2 = Number(s.totalUSD || 0);
+  var isPaid = payment.full || (paidARS >= totalARS && (totalUSD2 === 0 || paidUSD >= totalUSD2));
+  var isPartial = !isPaid && (paidARS > 0 || paidUSD > 0);
+  var restanteARS = Math.max(0, totalARS - paidARS);
+  var restanteUSD = Math.max(0, totalUSD2 - paidUSD);
+
+  // Update restante cell — find td by looking at the row
+  var arsInput = document.getElementById('pay-ars-' + summaryId);
+  if (!arsInput) return;
+  var row = arsInput.closest('tr');
+  if (!row) return;
+  var tds = row.querySelectorAll('td');
+  // Col order: logo, tarjeta, vencimiento, total, minimo, restante(5), estado(6), pago(7)
+  var restanteTd = tds[5];
+  var estadoTd = tds[6];
+
+  if (restanteTd) {
+    if (isPaid) {
+      restanteTd.innerHTML = '<span style="color:var(--green);font-size:13px;font-weight:500">—</span>';
+    } else {
+      restanteTd.innerHTML = '<div class="num" style="font-size:13px">' + (restanteARS > 0 ? '$' + fmt(restanteARS) : '—') + '</div>' +
+        (restanteUSD > 0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(restanteUSD) + '</div>' : '');
+    }
+  }
+  if (estadoTd) {
+    estadoTd.innerHTML = isPaid
+      ? '<span class="badge green" style="font-size:11px">pagada</span>'
+      : isPartial
+        ? '<span class="badge amber" style="font-size:11px">parcial</span>'
+        : '<span class="badge gray" style="font-size:11px">pendiente</span>';
+  }
+
+  // Update vencimiento metric card if needed
+  var vencEl = document.getElementById('d-venc');
+  if (vencEl) {
+    var now = new Date();
+    var ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    var sel = document.getElementById('dash-month-sel');
+    if (sel && sel.value) ym = sel.value;
+    var ms = db.summaries.filter(function(x){ return x.month === ym; });
+    var nextVenc = null; var nextDays = null;
+    ms.forEach(function(x) {
+      var p = (db.payments && db.payments[x.id]) ? db.payments[x.id] : {};
+      var pa = Number(p.ars||0); var pu = Number(p.usd||0);
+      var tt = Number(x.total||0); var tu = Number(x.totalUSD||0);
+      var paid = p.full || (pa >= tt && (tu===0||pu>=tu));
+      if (!paid && x.vencimiento) {
+        var d = new Date(x.vencimiento + 'T00:00:00');
+        if (!nextVenc || d < nextVenc) { nextVenc = d; nextDays = daysUntil(x.vencimiento); }
+      }
+    });
+    if (nextVenc) {
+      vencEl.innerHTML = nextVenc.toLocaleDateString('es-AR', { day:'2-digit', month:'short' }) +
+        '<div style="font-size:10px;margin-top:2px">' + vencLabel(nextDays).replace(/<[^>]+>/g,'') + '</div>';
+      vencEl.style.color = nextDays !== null && nextDays <= 3 ? 'var(--red)' : nextDays <= 7 ? 'var(--amber)' : '';
+    } else {
+      vencEl.textContent = '—';
+      vencEl.style.color = '';
+    }
+  }
 }
 
 function toggleFullPayment(summaryId, totalARS, totalUSD) {
@@ -486,6 +557,7 @@ function toggleFullPayment(summaryId, totalARS, totalUSD) {
     if (usdEl) usdEl.value = '';
   }
   savePayment(summaryId);
+  renderDashboard();
 }
 
 
