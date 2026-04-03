@@ -240,10 +240,47 @@ function renderDashboard() {
     vencEl.textContent = '-';
   }
 
-  // Cards with payment input
+  // Cards table
   var dc = document.getElementById('dash-cards');
   if (!ms.length) {
     dc.innerHTML = '<div class="empty">Sin datos para este mes</div>';
+  } else {
+    var rows = ms.map(function(s) {
+      var card = db.cards.find(function(c){ return c.id === s.cardId; }) || { name: s.cardName || 'Tarjeta', autoDebit: 'no' };
+      var extra = Number(s.total||0) - Number(s.minimo||0);
+      var days = daysUntil(s.vencimiento);
+      var payment = (db.payments && db.payments[s.id]) ? db.payments[s.id] : {};
+      var isPaid = !!(payment.ars || payment.usd);
+      var vencBadge = days === null ? '' :
+        days < 0  ? '<span class="badge red"   style="font-size:10px;margin-left:4px">vencida</span>' :
+        days === 0 ? '<span class="badge red"   style="font-size:10px;margin-left:4px">hoy</span>' :
+        days <= 3  ? '<span class="badge red"   style="font-size:10px;margin-left:4px">' + days + 'd</span>' :
+        days <= 7  ? '<span class="badge amber" style="font-size:10px;margin-left:4px">' + days + 'd</span>' :
+                     '<span class="badge green" style="font-size:10px;margin-left:4px">' + days + 'd</span>';
+      return '<tr>' +
+        '<td style="width:52px">' + cardLogo(card.type) + '</td>' +
+        '<td><div style="font-weight:500;font-size:13px">' + card.name + '</div>' +
+            '<div style="font-size:11px;color:var(--text2)">' + (card.bank||'') + '</div></td>' +
+        '<td>' + fmtDate(s.vencimiento) + vencBadge +
+          (card.autoDebit==='yes' && extra>0 ? '<div style="font-size:10px;color:var(--amber);margin-top:2px">+$' + fmt(extra) + ' sobre mín.</div>' : '') +
+        '</td>' +
+        '<td style="text-align:right"><div class="num">$' + fmt(s.total||0) + '</div>' +
+          (Number(s.totalUSD)>0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(s.totalUSD) + '</div>' : '') + '</td>' +
+        '<td style="text-align:right"><div class="num" style="color:var(--amber)">$' + fmt(s.minimo||0) + '</div>' +
+          '<span class="badge ' + (card.autoDebit==='yes'?'amber':'blue') + '" style="font-size:10px;margin-top:2px;display:inline-block">' + (card.autoDebit==='yes'?'auto':'manual') + '</span></td>' +
+        '<td>' + (isPaid ? '<span class="badge green" style="font-size:11px">pagada</span>' : '<span class="badge gray" style="font-size:11px">pendiente</span>') + '</td>' +
+        '<td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">' +
+          '<input type="number" placeholder="$" value="' + (payment.ars||'') + '" style="width:88px;font-size:12px;padding:4px 8px" id="pay-ars-' + s.id + '" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)">' +
+          (Number(s.totalUSD)>0 ? '<input type="number" placeholder="U$S" value="' + (payment.usd||'') + '" style="width:70px;font-size:12px;padding:4px 8px" id="pay-usd-' + s.id + '" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)">' : '<input type="hidden" id="pay-usd-' + s.id + '" value="' + (payment.usd||'') + '">') +
+          '<label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;white-space:nowrap">' +
+            '<input type="checkbox" id="pay-full-' + s.id + '" data-sid="' + s.id + '" data-total="' + (s.total||0) + '" data-usd="' + (s.totalUSD||0) + '" ' + (payment.full?'checked':'') + ' onchange="toggleFullPayment(this.dataset.sid,this.dataset.total,this.dataset.usd)">Total' +
+          '</label>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+    dc.innerHTML = '<div class="table-wrap"><table>' +
+      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th><th>Estado</th><th>Pago</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>';
   }
 
   // Extensions — from summaries + from manual gastosTerceros
@@ -311,13 +348,10 @@ function renderDashboard() {
 function toggleDashExt() {
   var el = document.getElementById('dash-ext');
   var btn = document.getElementById('dash-ext-btn');
-  var col = document.getElementById('dash-two-col');
   if (!el) return;
   var visible = el.style.display !== 'none';
   el.style.display = visible ? 'none' : 'block';
-  if (btn) btn.textContent = visible ? btn.textContent.replace('Ocultar','Mostrar') : 'Ocultar';
-  // Expand to two columns when extensions visible, single when hidden
-  if (col) col.style.gridTemplateColumns = visible ? '1fr' : '1fr 1fr';
+  if (btn) btn.textContent = visible ? 'Mostrar' : 'Ocultar';
 }
 
 function updateNewToggleBtn() {
