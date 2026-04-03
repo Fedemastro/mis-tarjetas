@@ -291,9 +291,10 @@ function renderDashboard() {
           (card.autoDebit==='yes' && extra>0 ? '<div style="font-size:10px;color:var(--amber);margin-top:1px">+$' + fmt(extra) + ' sobre mín.</div>' : '') +
         '</td>' +
         '<td style="text-align:right">' +
-          (restanteARS > 0 ? '<div class="num" style="font-size:13px">$' + fmt(restanteARS) + '</div>' : '') +
-          (restanteUSD > 0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(restanteUSD) + '</div>' : '') +
-          (isPaid ? '<div style="font-size:10px;color:var(--green)">pagado</div>' : '') +
+          (isPaid
+            ? '<span style="color:var(--green);font-size:13px;font-weight:500">—</span>'
+            : '<div class="num" style="font-size:13px">' + (restanteARS > 0 ? '$' + fmt(restanteARS) : '—') + '</div>' +
+              (restanteUSD > 0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(restanteUSD) + '</div>' : '')) +
         '</td>' +
         '<td>' +
           (isPaid ? '<span class="badge green" style="font-size:11px">pagada</span>' :
@@ -310,7 +311,7 @@ function renderDashboard() {
       '</tr>';
     }).join('');
     dc.innerHTML = '<div class="table-wrap"><table>' +
-      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th><th>Estado</th><th>Pago</th></tr></thead>' +
+      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th>Restante<th>Estado</th><th>Pago</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div>';
   }
 
