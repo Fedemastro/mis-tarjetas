@@ -2,7 +2,7 @@
 
 const PROXY_URL = 'https://claudeworker.fedemusic2008.workers.dev';
 // Token secreto — tiene que coincidir con AUTH_TOKEN en Cloudflare
-const AUTH_TOKEN = '445daa74-08f5-4f4d-a6d3-29d6191804e1';
+const AUTH_TOKEN = 'REEMPLAZA_CON_TU_TOKEN_SECRETO';
 
 let db = {
   cards: [], extHolders: [], summaries: [],
@@ -175,6 +175,17 @@ function getPrevMonth(ym) {
 
 // --- Dashboard ---
 
+function cardLogo(type) {
+  if (!type) return '<div style="width:44px;height:28px;background:var(--bg);border-radius:4px;border:1px solid var(--border)"></div>';
+  var t = (type || '').toLowerCase();
+  if (t === 'visa') return '<svg width="44" height="28" viewBox="0 0 44 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="border-radius:4px"><rect width="44" height="28" fill="#1A1F71"/><text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle" fill="#FFFFFF" font-size="11" font-family="Arial" font-weight="700" font-style="italic" letter-spacing="1">VISA</text></svg>';
+  if (t === 'mastercard') return '<svg width="44" height="28" viewBox="0 0 44 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="border-radius:4px"><rect width="44" height="28" fill="#252525"/><circle cx="17" cy="14" r="8" fill="#EB001B"/><circle cx="27" cy="14" r="8" fill="#F79E1B"/><path d="M22 7.5a8 8 0 0 1 0 13 8 8 0 0 1 0-13z" fill="#FF5F00"/></svg>';
+  if (t === 'american express' || t === 'amex') return '<svg width="44" height="28" viewBox="0 0 44 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="border-radius:4px"><rect width="44" height="28" fill="#2E77BC"/><text x="50%" y="52%" dominant-baseline="middle" text-anchor="middle" fill="#FFFFFF" font-size="7" font-family="Arial" font-weight="700" letter-spacing=".5">AMERICAN</text><text x="50%" y="76%" dominant-baseline="middle" text-anchor="middle" fill="#FFFFFF" font-size="7" font-family="Arial" font-weight="700" letter-spacing=".5">EXPRESS</text></svg>';
+  if (t === 'naranja') return '<svg width="44" height="28" viewBox="0 0 44 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="border-radius:4px"><rect width="44" height="28" fill="#FF6B00"/><text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle" fill="#FFFFFF" font-size="8" font-family="Arial" font-weight="700">NARANJA</text></svg>';
+  return '<div style="width:44px;height:28px;background:var(--purple-light);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--purple)">' + (type||'').substring(0,3).toUpperCase() + '</div>';
+}
+
+
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   var today = new Date(); today.setHours(0,0,0,0);
@@ -233,41 +244,6 @@ function renderDashboard() {
   var dc = document.getElementById('dash-cards');
   if (!ms.length) {
     dc.innerHTML = '<div class="empty">Sin datos para este mes</div>';
-  } else {
-    dc.innerHTML = ms.map(function(s) {
-      var card = db.cards.find(function(c){ return c.id === s.cardId; }) || { name: s.cardName || 'Tarjeta', autoDebit: 'no' };
-      var extra = Number(s.total || 0) - Number(s.minimo || 0);
-      var days = daysUntil(s.vencimiento);
-      var payment = db.payments && db.payments[s.id] ? db.payments[s.id] : {};
-      return '<div style="padding:10px 0 12px;border-bottom:1px solid var(--border);margin-bottom:2px">' +
-        '<div style="' + vencColor(days) + ';border-radius:6px;padding:8px 12px;margin-bottom:8px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
-            '<div>' +
-              '<div style="font-weight:500;font-size:13px">' + card.name + '</div>' +
-              '<div style="font-size:11px;color:var(--text2);margin-top:2px">' +
-                vencLabel(days) + ' &nbsp;·&nbsp; ' + fmtDate(s.vencimiento) +
-              '</div>' +
-              '<div style="font-size:11px;color:var(--text2);margin-top:1px">Min: $' + fmt(s.minimo||0) + '</div>' +
-              (card.autoDebit === 'yes' && extra > 0 ? '<div style="font-size:11px;color:var(--amber);margin-top:1px">Extra sobre mínimo: $' + fmt(extra) + '</div>' : '') +
-            '</div>' +
-            '<div style="text-align:right">' +
-              '<div style="font-family:var(--mono);font-size:15px;font-weight:500">$' + fmt(s.total||0) + '</div>' +
-              (Number(s.totalUSD)>0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(s.totalUSD) + '</div>' : '') +
-              '<span class="badge ' + (card.autoDebit==='yes'?'amber':'blue') + '" style="margin-top:3px;display:inline-block;font-size:10px">' + (card.autoDebit==='yes'?'débito auto':'manual') + '</span>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="background:var(--surface2);border-radius:6px;padding:8px 10px">' +
-          '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Registrar pago</div>' +
-          '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
-            '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--text2)">Pesos $</label><input type="number" id="pay-ars-' + s.id + '" placeholder="0" value="' + (payment.ars||'') + '" style="width:110px;font-size:12px;padding:5px 8px" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)"></div>' +
-            '<div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:10px;color:var(--text2)">Dólares U$S</label><input type="number" id="pay-usd-' + s.id + '" placeholder="0" value="' + (payment.usd||'') + '" style="width:90px;font-size:12px;padding:5px 8px" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)"></div>' +
-            '<div style="display:flex;flex-direction:column;gap:2px;padding-top:14px"><label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer"><input type="checkbox" id="pay-full-' + s.id + '" data-sid="' + s.id + '" data-total="' + (s.total||0) + '" data-usd="' + (s.totalUSD||0) + '" ' + (payment.full?'checked':'') + ' onchange="toggleFullPayment(this.dataset.sid,this.dataset.total,this.dataset.usd)">Pago total</label></div>' +
-            (payment.ars || payment.usd ? '<div style="padding-top:14px;font-size:11px;color:var(--green);font-weight:500">&#10003; Pagado</div>' : '') +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
   }
 
   // Extensions — from summaries + from manual gastosTerceros
