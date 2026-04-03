@@ -794,25 +794,19 @@ async function extractWithAI() {
     userContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: uploadedFileData } });
   }
 
-  const prompt = 'Analiza este resumen de tarjeta de credito argentina. Extrae TODOS los movimientos y responde SOLO con JSON valido, sin markdown ni backticks:\n' +
-    '{\n' +
-    '  "cardName": "nombre de la tarjeta",\n' +
-    '  "vencimiento": "YYYY-MM-DD",\n' +
-    '  "minimo": numero positivo en pesos,\n' +
-    '  "total": numero positivo en pesos (saldo actual a pagar),\n' +
-    '  "totalUSD": numero positivo en dolares (0 si no hay),\n' +
-    '  "ownExpenses": [{"desc":"descripcion del movimiento","amount":numero,"isCredit":true/false,"currency":"ARS o USD","category":"una de: Supermercado/Restaurantes / Comida/Nafta / Transporte/Servicios/Salud/Ropa / Indumentaria/Entretenimiento/Viajes/Otros","date":"YYYY-MM-DD","cuotas":numero total o null,"cuotaActual":numero actual o null}],\n' +
-    '  "extensions": [{"holder":"nombre del titular","total":numero en pesos,"totalUSD":numero en dolares o 0,"items":[{"desc":"comercio","amount":numero,"isCredit":false,"currency":"ARS o USD","cuotas":numero o null,"cuotaActual":numero o null}]}]\n' +
-    '}\n' +
-    'REGLAS CRITICAS:\n' +
-    '1. Incluir TODOS los movimientos: consumos, pagos, intereses, impuestos, ajustes.\n' +
-    '2. El campo isCredit=true para pagos, devoluciones o cualquier movimiento que REDUCE el saldo (montos negativos en el resumen, filas que dicen SU PAGO, PAGO, CREDITO, DEVOLUCION). isCredit=false para consumos que AUMENTAN el saldo.\n' +
-    '3. El campo amount siempre es POSITIVO. Usar isCredit para indicar si es debito o credito.\n' +
-    '4. currency=USD si el monto figura en la columna DOLARES o dice USD. currency=ARS si figura en pesos.\n' +
-    '5. Para cuotas: buscar patrones como C.03/12 o 3/12 o cuota 3 de 12. cuotaActual=3, cuotas=12.\n' +
-    '6. Las extensiones tienen su propia seccion con el nombre del titular.\n' +
-    '7. minimo y total son los valores que figuran explicitamente en el resumen como PAGO MINIMO y SALDO ACTUAL.\n' +
-    '8. Si hay muchos gastos, incluirlos todos de todas formas. Usar descripciones cortas (max 30 caracteres). No omitir ningun gasto.';
+  const prompt = 'Analiza este resumen de tarjeta de credito argentina. Responde SOLO con JSON minificado (sin espacios, sin markdown, sin backticks). Formato exacto:\n' +
+    '{"cardName":"...","vencimiento":"YYYY-MM-DD","minimo":0,"total":0,"totalUSD":0,"ownExpenses":[{"d":"desc","a":0,"c":false,"cu":"ARS","cat":"categoria","dt":"YYYY-MM-DD","q":null,"qi":null}],"extensions":[{"holder":"...","total":0,"totalUSD":0,"items":[{"d":"desc","a":0,"cu":"ARS","q":null,"qi":null}]}]}\n' +
+    'Campos: d=descripcion(max25chars), a=amount(numero), c=isCredit(true/false), cu=currency(ARS/USD), cat=categoria, dt=fecha, q=cuotas totales(null si no), qi=cuota actual(null si no).\n' +
+    'REGLAS:\n' +
+    '1. Incluir TODOS los movimientos sin excepcion.\n' +
+    '2. c=true para pagos/devoluciones (montos negativos en el resumen). c=false para consumos.\n' +
+    '3. a siempre positivo.\n' +
+    '4. cu=USD si figura en columna DOLARES, sino ARS.\n' +
+    '5. Para cuotas buscar patron C.03/12: q=12, qi=3.\n' +
+    '6. cat debe ser una de: Supermercado/Restaurantes/Transporte/Servicios/Salud/Ropa/Entretenimiento/Viajes/Otros.\n' +
+    '7. minimo y total son PAGO MINIMO y SALDO ACTUAL del resumen.\n' +
+    '8. Extensions tienen su propia seccion con nombre del titular.\n' +
+    '9. JSON minificado, sin saltos de linea, sin espacios innecesarios.';
 
   userContent.push({ type: 'text', text: prompt });
 
@@ -860,6 +854,27 @@ function confirmExtraction() {
   const month  = document.getElementById('upload-month').value;
   const card   = db.cards.find(c => c.id === cardId) || null;
   const p = pendingExtraction;
+  // Map compact keys to full keys if needed
+  function mapExpense(e) {
+    return {
+      desc: e.desc || e.d || '',
+      amount: Number(e.amount || e.a || 0),
+      isCredit: e.isCredit !== undefined ? e.isCredit : (e.c || false),
+      currency: e.currency || e.cu || 'ARS',
+      category: e.category || e.cat || 'Otros',
+      date: e.date || e.dt || '',
+      cuotas: e.cuotas !== undefined ? e.cuotas : (e.q !== undefined ? e.q : null),
+      cuotaActual: e.cuotaActual !== undefined ? e.cuotaActual : (e.qi !== undefined ? e.qi : null)
+    };
+  }
+  function mapExtension(ext) {
+    return {
+      holder: ext.holder || '',
+      total: Number(ext.total || 0),
+      totalUSD: Number(ext.totalUSD || 0),
+      items: (ext.items || []).map(mapExpense)
+    };
+  }
   db.summaries.push({
     id: 's' + Date.now(), cardId, uploadedAt: new Date().toISOString(),
     cardName: card ? card.name : (p.cardName || 'Tarjeta'),
@@ -867,8 +882,8 @@ function confirmExtraction() {
     minimo: Number(p.minimo || 0),
     total: Number(p.total || 0),
     totalUSD: Number(p.totalUSD || 0),
-    ownExpenses: p.ownExpenses || [],
-    extensions: p.extensions || []
+    ownExpenses: (p.ownExpenses || []).map(mapExpense),
+    extensions: (p.extensions || []).map(mapExtension)
   });
   saveAndSync();
   pendingExtraction = null;
