@@ -183,7 +183,10 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
 
     <!-- DASHBOARD -->
     <div class="section active" id="s-dashboard">
-      <div class="ph"><div class="pt">Dashboard</div><div class="ps" id="dash-month-label"></div></div>
+      <div class="ph" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div><div class="pt">Dashboard</div><div class="ps" id="dash-month-label"></div></div>
+        <input type="month" id="dash-month-sel" onchange="renderDashboard()" style="width:160px;font-size:13px">
+      </div>
       <div class="mg">
         <div class="mc"><div class="mi p">$</div><div class="mb"><div class="lbl">Total a pagar</div><div class="val" id="d-total">$0</div></div></div>
         <div class="mc"><div class="mi a">!</div><div class="mb"><div class="lbl">Mínimos</div><div class="val warn" id="d-min">$0</div></div></div>
