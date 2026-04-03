@@ -58,10 +58,12 @@ async function manualSync() {
   document.getElementById('sync-btn').disabled = true;
   const remote = await pullFromSheets(cfg.sheetId);
   if (remote) {
+    console.log('Sheets sync - summaries count:', remote.summaries ? remote.summaries.length : 0);
+    if (remote.summaries) remote.summaries.forEach(function(s){ console.log(' -', s.cardName, s.month, s.id); });
     db = { ...db, ...remote };
     saveLocal();
     renderCurrentSection();
-    setSyncStatus('ok', 'sincronizado');
+    setSyncStatus('ok', 'sincronizado (' + (remote.summaries ? remote.summaries.length : 0) + ' res.)');
   } else {
     const ok = await pushToSheets(cfg.sheetId, db);
     setSyncStatus(ok ? 'ok' : 'error', ok ? 'sincronizado' : 'error');
