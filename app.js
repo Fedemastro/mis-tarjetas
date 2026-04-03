@@ -182,10 +182,10 @@ function daysUntil(dateStr) {
 
 function vencColor(days) {
   if (days === null) return '';
-  if (days < 0)  return 'background:#fde8e8;border-left:3px solid var(--red)';
-  if (days <= 3) return 'background:#fde8e8;border-left:3px solid var(--red)';
+  if (days < 0)  return 'background:var(--red-bg);border-radius:var(--radius-sm);border-left:3px solid var(--red);padding:8px 12px';
+  if (days <= 3) return 'background:var(--red-bg);border-radius:var(--radius-sm);border-left:3px solid var(--red);padding:8px 12px';
   if (days <= 7) return 'background:#fef3cd;border-left:3px solid var(--amber)';
-  return 'background:var(--surface2);border-left:3px solid var(--green)';
+  return 'background:var(--green-bg);border-radius:var(--radius-sm);border-left:3px solid var(--green);padding:8px 12px';
 }
 
 function vencLabel(days) {
@@ -658,7 +658,7 @@ function renderCatSummary() {
         '<span style="font-size:13px">' + k + '</span>' +
         '<span style="font-family:var(--mono);font-size:13px">$' + fmt(bycat[k]) + ' <span style="color:var(--text2)">(' + pct + '%)</span></span>' +
       '</div>' +
-      '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="pb"><div class="pf" style="width:' + pct + '%"></div></div>' +
     '</div>';
   }).join('');
 }
