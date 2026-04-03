@@ -828,7 +828,11 @@ async function extractWithAI() {
       return;
     }
     const text = data.content.map(i => i.text || '').join('');
-    const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Strip markdown code fences, leading/trailing whitespace, find first { to last }
+    var clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    var firstBrace = clean.indexOf('{');
+    var lastBrace = clean.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) clean = clean.slice(firstBrace, lastBrace + 1);
     try {
       pendingExtraction = JSON.parse(clean);
       out.textContent = JSON.stringify(pendingExtraction, null, 2);
