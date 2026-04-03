@@ -902,20 +902,48 @@ function confirmExtraction() {
       items: (ext.items || []).map(mapExpense)
     };
   }
-  db.summaries.push({
-    id: 's' + Date.now(), cardId, uploadedAt: new Date().toISOString(),
+  var summaryId = 's' + Date.now();
+  var summaryObj = {
+    id: summaryId, cardId, uploadedAt: new Date().toISOString(),
     cardName: card ? card.name : (p.cardName || 'Tarjeta'),
     month, vencimiento: p.vencimiento || '',
     minimo: Number(p.minimo || 0),
     total: Number(p.total || 0),
     totalUSD: Number(p.totalUSD || 0),
     ownExpenses: (p.ownExpenses || []).map(mapExpense),
-    extensions: (p.extensions || []).map(mapExtension)
-  });
+    extensions: (p.extensions || []).map(mapExtension),
+    driveFileId: null,
+    driveLink: null
+  };
+  db.summaries.push(summaryObj);
   saveAndSync();
   pendingExtraction = null;
-  document.getElementById('ai-output').textContent = 'Guardado correctamente.';
+  document.getElementById('ai-output').textContent = 'Guardado. Subiendo archivo a Drive...';
   document.getElementById('confirm-btn').style.display = 'none';
+
+  // Upload original file to Drive in background
+  if (useSheets && isAuthorized && uploadedFileData) {
+    var cardNameSafe = (summaryObj.cardName || 'tarjeta').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    var fileName = cardNameSafe + ' - ' + month + '.' + (uploadedFileType === 'application/pdf' ? 'pdf' : 'jpg');
+    var folderPath = month;
+    uploadToDrive(fileName, uploadedFileData, uploadedFileType || 'application/pdf', folderPath)
+      .then(function(result) {
+        if (result) {
+          summaryObj.driveFileId = result.id;
+          summaryObj.driveLink = result.link;
+          // Update the summary in db
+          var idx = db.summaries.findIndex(function(s){ return s.id === summaryId; });
+          if (idx !== -1) db.summaries[idx] = summaryObj;
+          saveAndSync();
+          document.getElementById('ai-output').textContent = 'Guardado y subido a Drive correctamente.';
+        } else {
+          document.getElementById('ai-output').textContent = 'Guardado. No se pudo subir a Drive.';
+        }
+      });
+  } else {
+    document.getElementById('ai-output').textContent = 'Guardado correctamente.';
+  }
+
   resetDropZone();
   renderDashboard();
 }
@@ -1055,7 +1083,7 @@ function renderHistorico() {
       '<th>Tarjeta</th><th>Mes</th><th>Subido</th>' +
       '<th style="text-align:right">Total $</th>' +
       '<th style="text-align:right">Total U$S</th>' +
-      '<th></th>' +
+      '<th>Drive</th>' +
     '</tr></thead>' +
     '<tbody>' + rows + '</tbody>' +
     '</table></div>';
