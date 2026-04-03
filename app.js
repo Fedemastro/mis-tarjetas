@@ -214,10 +214,18 @@ var _newItems = [];
 
 function renderDashboard() {
   var now = new Date();
-  var ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  var defaultYm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  var sel = document.getElementById('dash-month-sel');
+  if (sel && !sel.value) sel.value = defaultYm;
+  var ym = (sel && sel.value) ? sel.value : defaultYm;
   var lbl = document.getElementById('dash-month-label');
   if (lbl) lbl.textContent = new Date(ym + '-01').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-  var ms = db.summaries.filter(function(s){ return s.month === ym; });
+  var ms = db.summaries.filter(function(s){ return s.month === ym; })
+    .sort(function(a, b) {
+      if (!a.vencimiento) return 1;
+      if (!b.vencimiento) return -1;
+      return a.vencimiento < b.vencimiento ? -1 : a.vencimiento > b.vencimiento ? 1 : 0;
+    });
   var totalARS = 0, totalMin = 0, totalUSD = 0, nextVenc = null, nextDays = null;
   ms.forEach(function(s) {
     totalARS += Number(s.total || 0);
@@ -261,13 +269,13 @@ function renderDashboard() {
         '<td style="width:52px">' + cardLogo(card.type) + '</td>' +
         '<td><div style="font-weight:500;font-size:13px">' + card.name + '</div>' +
             '<div style="font-size:11px;color:var(--text2)">' + (card.bank||'') + '</div></td>' +
-        '<td>' + fmtDate(s.vencimiento) + vencBadge +
-          (card.autoDebit==='yes' && extra>0 ? '<div style="font-size:10px;color:var(--amber);margin-top:2px">+$' + fmt(extra) + ' sobre mín.</div>' : '') +
-        '</td>' +
+        '<td>' + fmtDate(s.vencimiento) + vencBadge + '</td>' +
         '<td style="text-align:right"><div class="num">$' + fmt(s.total||0) + '</div>' +
           (Number(s.totalUSD)>0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(s.totalUSD) + '</div>' : '') + '</td>' +
-        '<td style="text-align:right"><div class="num" style="color:var(--amber)">$' + fmt(s.minimo||0) + '</div>' +
-          '<span class="badge ' + (card.autoDebit==='yes'?'amber':'blue') + '" style="font-size:10px;margin-top:2px;display:inline-block">' + (card.autoDebit==='yes'?'auto':'manual') + '</span></td>' +
+        '<td style="text-align:right">' +
+          '<div class="num" style="color:var(--amber)">$' + fmt(s.minimo||0) + (card.autoDebit==='yes' ? ' <span style="font-size:10px;color:var(--text2)">(auto)</span>' : '') + '</div>' +
+          (card.autoDebit==='yes' && extra>0 ? '<div style="font-size:10px;color:var(--amber);margin-top:1px">+$' + fmt(extra) + ' sobre mín.</div>' : '') +
+        '</td>' +
         '<td>' + (isPaid ? '<span class="badge green" style="font-size:11px">pagada</span>' : '<span class="badge gray" style="font-size:11px">pendiente</span>') + '</td>' +
         '<td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">' +
           '<input type="number" placeholder="$" value="' + (payment.ars||'') + '" style="width:88px;font-size:12px;padding:4px 8px" id="pay-ars-' + s.id + '" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)">' +
@@ -299,7 +307,11 @@ function renderDashboard() {
     if (!extData[g.holder]) extData[g.holder] = { fromSummary: 0, fromManual: 0 };
     extData[g.holder].fromManual += Number(g.amount||0);
   });
-  var extKeys = Object.keys(extData);
+  // Only show registered extension holders, not the main cardholder
+  var registeredHolders = db.extHolders.map(function(h){ return h.name.toLowerCase().trim(); });
+  var extKeys = Object.keys(extData).filter(function(k) {
+    return registeredHolders.length === 0 || registeredHolders.indexOf(k.toLowerCase().trim()) !== -1;
+  });
   var extBtn = document.getElementById('dash-ext-btn');
   if (extBtn) extBtn.textContent = extKeys.length ? ('Mostrar (' + extKeys.length + ')') : 'Mostrar';
   if (!extKeys.length) {
