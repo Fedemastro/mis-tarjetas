@@ -1189,23 +1189,35 @@ function renderHistorico() {
     var sid = s.id;
 
     var expRows = '';
-    var catOptions = db.categories.map(function(c){
-      return '<option>' + c + '</option>';
-    }).join('');
     for (var j = 0; j < expenses.length; j++) {
       var e = expenses[j];
-      var cuotasTag = (e.cuotas && e.cuotas > 1)
-        ? ' <span class="badge blue" style="font-size:10px">' + (e.cuotaActual || '?') + '/' + e.cuotas + ' cuotas</span>'
+      var eDesc = e.desc || e.d || '-';
+      var eAmount = Number(e.amount || e.a || 0);
+      var eCurrency = e.currency || e.cu || 'ARS';
+      var eCategory = e.category || e.cat || 'Otros';
+      var eIsCredit = !!(e.isCredit || e.cr);
+      var eCuotas = e.cuotas || e.q;
+      var eCuotaActual = e.cuotaActual || e.qi;
+      var cuotasTag = (eCuotas && eCuotas > 1)
+        ? ' <span class="badge blue" style="font-size:10px">' + (eCuotaActual || '?') + '/' + eCuotas + ' cuotas</span>'
         : '';
-      var currSymbol = (e.currency === 'USD') ? 'U$S ' : '$';
-      var creditStyle = e.isCredit ? 'color:var(--green)' : '';
-      var creditSign = e.isCredit ? '-' : '';
+      var currSymbol = (eCurrency === 'USD') ? 'U$S ' : '$';
+      var creditStyle = eIsCredit ? 'color:var(--green)' : '';
+      var creditSign = eIsCredit ? '-' : '';
+      // Highlight if matches search
+      var descHtml = eDesc;
+      if (searchQuery && eDesc.toLowerCase().indexOf(searchQuery) !== -1) {
+        var idx = eDesc.toLowerCase().indexOf(searchQuery);
+        descHtml = eDesc.substring(0, idx) +
+          '<mark style="background:#fff3cd;border-radius:2px;padding:0 2px">' + eDesc.substring(idx, idx + searchQuery.length) + '</mark>' +
+          eDesc.substring(idx + searchQuery.length);
+      }
       var catSel = '<select onchange="updateExpenseCategory(\'' + sid + '\', ' + j + ', this.value)" style="font-size:11px;padding:3px 6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);max-width:160px">' +
-        db.categories.map(function(c){ return '<option' + (c === (e.category||'Otros') ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
+        db.categories.map(function(c){ return '<option' + (c === eCategory ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
         '</select>';
-      expRows += '<tr><td>' + (e.desc || '-') + cuotasTag + '</td>' +
+      expRows += '<tr><td>' + descHtml + cuotasTag + '</td>' +
         '<td>' + catSel + '</td>' +
-        '<td class="num" style="text-align:right;' + creditStyle + '">' + creditSign + currSymbol + fmt(e.amount || 0) + '</td></tr>';
+        '<td class="num" style="text-align:right;' + creditStyle + '">' + creditSign + currSymbol + fmt(eAmount) + '</td></tr>';
     }
 
     var extHtml = '';
