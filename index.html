@@ -190,18 +190,16 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
         <div class="mc"><div class="mi b">U$</div><div class="mb"><div class="lbl">En dólares</div><div class="val" id="d-usd">U$S 0</div></div></div>
         <div class="mc"><div class="mi r">cal</div><div class="mb"><div class="lbl">Próx. vencimiento</div><div class="val" id="d-venc" style="font-size:15px">—</div></div></div>
       </div>
-      <div class="two-col" id="dash-two-col" style="grid-template-columns:1fr">
-        <div class="vc">
-          <div class="vct">Mis tarjetas</div>
-          <div id="dash-cards"><div class="empty">Sin datos para este mes</div></div>
+      <div class="vc">
+        <div class="vct" style="margin-bottom:1rem">Mis tarjetas</div>
+        <div id="dash-cards"><div class="empty">Sin datos para este mes</div></div>
+      </div>
+      <div class="vc">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0">
+          <div class="vct">Extensiones del mes</div>
+          <button onclick="toggleDashExt()" id="dash-ext-btn" class="btn sm">Mostrar</button>
         </div>
-        <div class="vc">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-            <div class="vct">Extensiones del mes</div>
-            <button onclick="toggleDashExt()" id="dash-ext-btn" class="btn sm">Mostrar</button>
-          </div>
-          <div id="dash-ext" style="display:none"><div class="empty">Sin extensiones</div></div>
-        </div>
+        <div id="dash-ext" style="display:none;margin-top:12px"><div class="empty">Sin extensiones</div></div>
       </div>
       <div class="vc">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem">
