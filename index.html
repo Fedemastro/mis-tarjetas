@@ -5,261 +5,215 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mis Tarjetas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #f5f4f0;
-    --surface: #ffffff;
-    --surface2: #f0efe9;
-    --border: #e2e0d8;
-    --border2: #ccc9be;
-    --text: #1a1916;
-    --text2: #6b6860;
-    --text3: #9e9c96;
-    --accent: #1a1916;
-    --green: #2d6a4f;
-    --green-bg: #d8f3dc;
-    --red: #9b2226;
-    --red-bg: #fde8e8;
-    --amber: #7c4f00;
-    --amber-bg: #fef3cd;
-    --blue: #1a4f7a;
-    --blue-bg: #dbeafe;
-    --radius: 10px;
-    --radius-sm: 6px;
-    --mono: 'DM Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--sans); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
-
-  /* AUTH SCREEN */
-  #auth-screen {
-    display: flex; align-items: center; justify-content: center;
-    min-height: 100vh; flex-direction: column; gap: 24px; padding: 2rem;
-  }
-  .auth-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 2.5rem; max-width: 420px; width: 100%; text-align: center;
-  }
-  .auth-title { font-size: 22px; font-weight: 500; margin-bottom: 8px; letter-spacing: -0.5px; }
-  .auth-sub { color: var(--text2); font-size: 13px; line-height: 1.6; margin-bottom: 28px; }
-  .auth-step { display: flex; align-items: flex-start; gap: 12px; text-align: left; margin-bottom: 12px; padding: 12px; background: var(--surface2); border-radius: var(--radius-sm); }
-  .auth-step-num { font-family: var(--mono); font-size: 11px; background: var(--text); color: #fff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
-  .auth-step p { font-size: 12px; line-height: 1.5; color: var(--text2); }
-  .auth-step p b { color: var(--text); font-weight: 500; }
-  .auth-input-wrap { margin: 20px 0 0; }
-  .auth-input-wrap label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; text-align: left; }
-  .auth-input-wrap input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--mono); font-size: 12px; background: var(--bg); color: var(--text); margin-bottom: 8px; }
-  .auth-input-wrap input:focus { outline: none; border-color: var(--border2); }
-
-  /* HEADER */
-  #app { display: none; }
-  header {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 0 1.5rem; display: flex; align-items: center; justify-content: space-between;
-    height: 52px; position: sticky; top: 0; z-index: 100;
-  }
-  .logo { font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: -0.3px; }
-  .logo span { color: var(--text2); font-weight: 400; }
-  .header-right { display: flex; align-items: center; gap: 10px; }
-  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
-  .sync-dot.syncing { background: var(--amber); animation: pulse 1s infinite; }
-  .sync-dot.error { background: var(--red); }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-  .sync-label { font-size: 11px; color: var(--text2); font-family: var(--mono); }
-
-  /* NAV */
-  nav {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 0 1.5rem; display: flex; gap: 0; overflow-x: auto;
-  }
-  nav button {
-    background: none; border: none; border-bottom: 2px solid transparent;
-    padding: 12px 14px; font-family: var(--sans); font-size: 13px; color: var(--text2);
-    cursor: pointer; white-space: nowrap; transition: all .15s;
-  }
-  nav button.active { color: var(--text); border-bottom-color: var(--text); font-weight: 500; }
-  nav button:hover:not(.active) { color: var(--text); }
-
-  /* LAYOUT */
-  main { padding: 1.5rem; max-width: 960px; margin: 0 auto; }
-  .section { display: none; }
-  .section.active { display: block; }
-
-  /* CARDS */
-  .card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem;
-  }
-  .card-title { font-size: 13px; font-weight: 500; margin-bottom: 1rem; color: var(--text); }
-  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
-  .metric { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px 16px; }
-  .metric .lbl { font-size: 11px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
-  .metric .val { font-family: var(--mono); font-size: 18px; font-weight: 500; }
-  .metric .val.warn { color: var(--amber); }
-  .metric .val.ok { color: var(--green); }
-  .metric .val.danger { color: var(--red); }
-
-  /* TABLE */
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--text2); font-weight: 400; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
-  td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: var(--surface2); }
-  .num { font-family: var(--mono); }
-
-  /* BADGES */
-  .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; font-family: var(--mono); }
-  .badge.green { background: var(--green-bg); color: var(--green); }
-  .badge.red { background: var(--red-bg); color: var(--red); }
-  .badge.amber { background: var(--amber-bg); color: var(--amber); }
-  .badge.blue { background: var(--blue-bg); color: var(--blue); }
-  .badge.new { background: #fff3cd; color: #664d03; }
-
-  /* FORMS */
-  .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-  .form-col { flex: 1; min-width: 150px; }
-  .form-col label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .4px; }
-  input, select, textarea {
-    width: 100%; padding: 8px 10px; border: 1px solid var(--border);
-    border-radius: var(--radius-sm); font-family: var(--sans); font-size: 13px;
-    background: var(--surface); color: var(--text); transition: border .15s;
-  }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--border2); }
-
-  /* BUTTONS */
-  .btn { padding: 8px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: var(--sans); font-size: 13px; cursor: pointer; transition: all .15s; }
-  .btn:hover { background: var(--surface2); }
-  .btn.primary { background: var(--text); color: #fff; border-color: var(--text); }
-  .btn.primary:hover { opacity: .85; }
-  .btn.danger { color: var(--red); border-color: transparent; }
-  .btn.danger:hover { background: var(--red-bg); }
-  .btn.sm { padding: 4px 10px; font-size: 12px; }
-  .btn:disabled { opacity: .4; cursor: not-allowed; }
-
-  /* UPLOAD */
-  .upload-zone {
-    border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 2rem;
-    text-align: center; cursor: pointer; color: var(--text2); font-size: 13px;
-    transition: all .15s; margin-bottom: 1rem; background: var(--bg);
-  }
-  .upload-zone:hover { background: var(--surface2); border-color: var(--text2); }
-  .upload-zone .icon { font-size: 28px; margin-bottom: 8px; }
-  .upload-zone .hint { font-size: 11px; margin-top: 4px; color: var(--text3); }
-
-  /* MISC */
-  hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
-  .empty { color: var(--text3); font-size: 13px; padding: 20px; text-align: center; font-style: italic; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } main { padding: 1rem; } header { padding: 0 1rem; } nav { padding: 0 1rem; } }
-  .tabs2 { display: flex; gap: 0; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; width: fit-content; }
-  .tabs2 button { padding: 6px 14px; border: none; background: transparent; font-family: var(--sans); font-size: 12px; color: var(--text2); cursor: pointer; transition: all .15s; }
-  .tabs2 button.active { background: var(--text); color: #fff; }
-  .ai-output { background: var(--surface2); border-radius: var(--radius-sm); padding: 14px; font-family: var(--mono); font-size: 12px; color: var(--text2); min-height: 80px; white-space: pre-wrap; word-break: break-word; margin-bottom: 1rem; max-height: 300px; overflow-y: auto; }
-  .ext-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); gap: 8px; flex-wrap: wrap; }
-  .ext-row:last-child { border-bottom: none; }
-  .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
-  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 6px; }
-  .progress-fill { height: 100%; background: var(--text); border-radius: 2px; transition: width .4s; }
-  .card-summary-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); }
-  .card-summary-item:last-child { border-bottom: none; }
-  .sheet-status { font-size: 11px; font-family: var(--mono); padding: 3px 8px; border-radius: 4px; }
-  .sheet-status.ok { background: var(--green-bg); color: var(--green); }
-  .sheet-status.err { background: var(--red-bg); color: var(--red); }
-  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 12px; font-weight: 500; }
+:root{
+  --purple:#7367f0;--purple-light:#ebe9fd;--purple-dark:#5e50ee;
+  --bg:#f8f7fa;--surface:#fff;--surface2:#f8f7fa;--border:#e9e7f0;
+  --text:#444050;--text2:#a49fbf;--text3:#c8c5d7;
+  --green:#28c76f;--green-bg:#e3f9ec;
+  --red:#ea5455;--red-bg:#fde8e8;
+  --amber:#ff9f43;--amber-bg:#fff4e6;
+  --blue:#00cfe8;--blue-bg:#e0f9fc;
+  --shadow:0 4px 24px 0 rgba(115,103,240,.08);
+  --shadow-sm:0 2px 8px 0 rgba(115,103,240,.06);
+  --radius:12px;--radius-sm:8px;
+  --font:'Public Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
+.auth-wrap{width:100%;max-width:440px}
+.auth-logo{text-align:center;margin-bottom:1.5rem;font-size:22px;font-weight:600;color:var(--purple)}
+.auth-logo em{color:var(--text);font-style:normal}
+.auth-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:2rem}
+.auth-title{font-size:18px;font-weight:600;margin-bottom:4px}
+.auth-sub{color:var(--text2);font-size:13px;margin-bottom:1.25rem}
+.auth-step{display:flex;gap:10px;margin-bottom:8px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)}
+.auth-step-num{width:22px;height:22px;border-radius:50%;background:var(--purple-light);color:var(--purple);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.auth-step p{font-size:12px;line-height:1.5;color:var(--text2)}
+.auth-step p b{color:var(--text);font-weight:500}
+.fg{margin-bottom:1rem}
+.fg label{display:block;font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.fg input{width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;color:var(--text);background:var(--surface);transition:border .15s}
+.fg input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(115,103,240,.12)}
+#app{display:none;min-height:100vh;display:none}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;height:62px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)}
+.logo-box{display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--purple),#9e95f5);border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px}
+.logo-text{font-size:16px;font-weight:600;color:var(--text);letter-spacing:-.3px}
+.sync-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:var(--bg);font-size:11px;color:var(--text2);border:1px solid var(--border)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.sync-dot.syncing{background:var(--amber);animation:pulse 1s infinite}
+.sync-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.nav-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;overflow-x:auto;display:flex}
+.nav-bar button{padding:14px 14px;border:none;border-bottom:2px solid transparent;background:transparent;font-family:var(--font);font-size:13px;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;display:flex;align-items:center;gap:5px;font-weight:400}
+.nav-bar button.active{color:var(--purple);border-bottom-color:var(--purple);font-weight:500}
+.nav-bar button:hover:not(.active){color:var(--text)}
+main{padding:1.5rem;max-width:1200px;margin:0 auto}
+.ph{margin-bottom:1.25rem}
+.ph .pt{font-size:18px;font-weight:600;color:var(--text)}
+.ph .ps{font-size:13px;color:var(--text2);margin-top:2px}
+.section{display:none}
+.section.active{display:block}
+.vc{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.25rem;margin-bottom:1.25rem}
+.vct{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.vcs{font-size:12px;color:var(--text2);margin-bottom:1rem}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1.25rem;margin-bottom:1.25rem}
+.mc{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:1.25rem;display:flex;align-items:center;gap:14px}
+.mi{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;font-weight:700}
+.mi.p{background:var(--purple-light);color:var(--purple)}
+.mi.g{background:var(--green-bg);color:var(--green)}
+.mi.a{background:var(--amber-bg);color:var(--amber)}
+.mi.b{background:var(--blue-bg);color:var(--blue)}
+.mi.r{background:var(--red-bg);color:var(--red)}
+.mb .lbl{font-size:12px;color:var(--text2);margin-bottom:3px}
+.mb .val{font-size:18px;font-weight:600;color:var(--text);line-height:1}
+.mb .val.warn{color:var(--amber)}
+.mb .val.danger{color:var(--red)}
+.mb .val.ok{color:var(--green)}
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500}
+.badge.p{background:var(--purple-light);color:var(--purple)}
+.badge.g{background:var(--green-bg);color:var(--green)}
+.badge.r{background:var(--red-bg);color:var(--red)}
+.badge.a{background:var(--amber-bg);color:var(--amber)}
+.badge.b{background:var(--blue-bg);color:var(--blue)}
+.badge.gray{background:var(--bg);color:var(--text2);border:1px solid var(--border)}
+.badge.new{background:#fff8e1;color:#f59e0b}
+.badge.green{background:var(--green-bg);color:var(--green)}
+.badge.red{background:var(--red-bg);color:var(--red)}
+.badge.amber{background:var(--amber-bg);color:var(--amber)}
+.badge.blue{background:var(--blue-bg);color:var(--blue)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{border-bottom:1px solid var(--border)}
+th{text-align:left;padding:10px 12px;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg)}
+.num{font-size:13px;font-weight:500}
+.form-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.form-col{flex:1;min-width:150px}
+.form-col label,.flbl{display:block;font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+input,select,textarea{width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;color:var(--text);background:var(--surface);transition:border .15s}
+input:focus,select:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(115,103,240,.12)}
+.btn{padding:8px 18px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--bg)}
+.btn.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+.btn.primary:hover{background:var(--purple-dark)}
+.btn.danger{color:var(--red);border-color:transparent}
+.btn.danger:hover{background:var(--red-bg)}
+.btn.sm{padding:5px 12px;font-size:12px}
+.btn.op{color:var(--purple);border-color:var(--purple-light);background:var(--purple-light)}
+.btn.op:hover{background:var(--purple);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:2rem;text-align:center;cursor:pointer;color:var(--text2);font-size:13px;transition:all .15s;background:var(--bg);margin-bottom:1rem}
+.upload-zone:hover{border-color:var(--purple);background:var(--purple-light)}
+.upload-zone .uzi{font-size:28px;margin-bottom:8px;color:var(--purple)}
+.upload-zone .uzh{font-size:11px;margin-top:4px;color:var(--text3)}
+hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
+.empty{color:var(--text3);font-size:13px;padding:24px;text-align:center;font-style:italic}
+.tabs2{display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;width:fit-content;margin-bottom:1rem}
+.tabs2 button{padding:7px 16px;border:none;background:transparent;font-family:var(--font);font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s}
+.tabs2 button.active{background:var(--purple);color:#fff}
+.aio{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-family:monospace;font-size:12px;color:var(--text2);min-height:80px;white-space:pre-wrap;word-break:break-word;margin-bottom:1rem;max-height:320px;overflow-y:auto}
+.ext-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap}
+.ext-row:last-child{border-bottom:none}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;background:var(--bg);color:var(--text2);border:1px solid var(--border)}
+.pb{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:6px}
+.pf{height:100%;background:var(--purple);border-radius:2px;transition:width .4s}
+.slbl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);margin-bottom:10px;font-weight:600}
+.sts{font-size:11px;padding:3px 8px;border-radius:4px;font-weight:500}
+.sts.ok{background:var(--green-bg);color:var(--green)}
+.sts.err{background:var(--red-bg);color:var(--red)}
+.two-col{display:grid;gap:1.25rem;margin-bottom:1.25rem}
+.pay-widget{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:8px}
+.pwt{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);font-weight:600;margin-bottom:10px}
+@media(max-width:600px){main{padding:1rem}.topbar,.nav-bar{padding:0 1rem}.mg{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
+<!-- AUTH -->
 <div id="auth-screen">
-  <div class="auth-card">
-    <div class="auth-title">Mis Tarjetas</div>
-    <div class="auth-sub">Ingresá tu API Key de Google Sheets para sincronizar datos entre dispositivos.</div>
-
-    <div class="auth-step">
-      <div class="auth-step-num">1</div>
-      <p>Andá a <b>console.cloud.google.com</b>, creá un proyecto nuevo y habilitá la <b>Google Sheets API</b>.</p>
+  <div class="auth-wrap">
+    <div class="auth-logo"><em>mis</em>tarjetas</div>
+    <div class="auth-card">
+      <div class="auth-title">Conectar con Google Sheets</div>
+      <div class="auth-sub">Sincronizá tus datos entre todos tus dispositivos</div>
+      <div class="auth-step"><div class="auth-step-num">1</div><p>Andá a <b>console.cloud.google.com</b>, creá un proyecto y habilitá la <b>Google Sheets API</b></p></div>
+      <div class="auth-step"><div class="auth-step-num">2</div><p>En <b>Credentials</b>, creá una <b>API Key</b> y un <b>OAuth 2.0 Client ID</b> (Web App). Agregá tu URL de GitHub Pages como origen autorizado</p></div>
+      <div class="auth-step"><div class="auth-step-num">3</div><p>Creá una <b>Google Spreadsheet</b> nueva y copiá el ID de la URL</p></div>
+      <div class="fg" style="margin-top:1.25rem"><label>Google Client ID (OAuth)</label><input type="text" id="cfg-client-id" placeholder="xxxx.apps.googleusercontent.com"></div>
+      <div class="fg"><label>API Key</label><input type="text" id="cfg-api-key" placeholder="AIzaSy..."></div>
+      <div class="fg"><label>Spreadsheet ID</label><input type="text" id="cfg-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"></div>
+      <button class="btn primary" style="width:100%;justify-content:center;padding:10px" onclick="initApp()">Conectar y continuar</button>
+      <hr>
+      <button class="btn" style="width:100%;justify-content:center;font-size:12px;color:var(--text2)" onclick="useLocalOnly()">Usar sin Google Sheets (solo local)</button>
     </div>
-    <div class="auth-step">
-      <div class="auth-step-num">2</div>
-      <p>En <b>APIs & Services → Credentials</b>, creá una <b>API Key</b> y una <b>OAuth 2.0 Client ID</b> (tipo Web App). Agregá tu URL de GitHub Pages como origen autorizado.</p>
-    </div>
-    <div class="auth-step">
-      <div class="auth-step-num">3</div>
-      <p>Creá una <b>Google Spreadsheet</b> nueva y copiá el ID de la URL (el string largo entre /d/ y /edit).</p>
-    </div>
-
-    <div class="auth-input-wrap">
-      <label>Google Client ID (OAuth)</label>
-      <input type="text" id="cfg-client-id" placeholder="xxxx.apps.googleusercontent.com">
-      <label>API Key</label>
-      <input type="text" id="cfg-api-key" placeholder="AIzaSy...">
-      <label>Spreadsheet ID</label>
-      <input type="text" id="cfg-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
-    </div>
-    <button class="btn primary" style="width:100%;margin-top:16px" onclick="initApp()">Conectar y continuar</button>
-    <hr style="margin:16px 0">
-    <button class="btn" style="width:100%;font-size:12px;color:var(--text2)" onclick="useLocalOnly()">Usar sin Google Sheets (solo local)</button>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app">
-  <header>
-    <div class="logo">mis<span>/</span>tarjetas</div>
-    <div class="header-right">
-      <div class="sync-dot" id="sync-dot"></div>
-      <span class="sync-label" id="sync-label">sincronizado</span>
-      <button class="btn sm" onclick="manualSync()" id="sync-btn">↻ Sync</button>
+  <header class="topbar">
+    <div class="logo-box">
+      <div class="logo-icon">MT</div>
+      <span class="logo-text">mistarjetas</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="sync-pill"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">sincronizado</span></div>
+      <button class="btn sm op" onclick="manualSync()" id="sync-btn">↻ Sync</button>
     </div>
   </header>
-  <nav>
-    <button class="active" onclick="nav(this,'dashboard')">Dashboard</button>
-    <button onclick="nav(this,'cargar')">Cargar resumen</button>
-    <button onclick="nav(this,'tarjetas')">Tarjetas</button>
-    <button onclick="nav(this,'extensiones')">Extensiones</button>
-    <button onclick="nav(this,'gastos')">Gastos extra</button>
-    <button onclick="nav(this,'categorias')">Categorías</button>
-    <button onclick="nav(this,'historico')">Histórico</button>
-    <button onclick="nav(this,'config')">Config</button>
+
+  <nav class="nav-bar">
+    <button class="active" onclick="nav(this,'dashboard')">⊞ Dashboard</button>
+    <button onclick="nav(this,'cargar')">↑ Cargar resumen</button>
+    <button onclick="nav(this,'tarjetas')">▣ Tarjetas</button>
+    <button onclick="nav(this,'extensiones')">◈ Extensiones</button>
+    <button onclick="nav(this,'gastos')">$ Gastos extra</button>
+    <button onclick="nav(this,'categorias')">◉ Categorías</button>
+    <button onclick="nav(this,'historico')">☰ Histórico</button>
+    <button onclick="nav(this,'config')">⚙ Config</button>
   </nav>
+
   <main>
 
     <!-- DASHBOARD -->
     <div class="section active" id="s-dashboard">
-      <div class="metrics-grid" id="dash-metrics">
-        <div class="metric"><div class="lbl">Total a pagar</div><div class="val" id="d-total">$0</div></div>
-        <div class="metric"><div class="lbl">Mínimos</div><div class="val warn" id="d-min">$0</div></div>
-        <div class="metric"><div class="lbl">En dólares</div><div class="val" id="d-usd">U$S 0</div></div>
-        <div class="metric"><div class="lbl">Próx. vencimiento</div><div class="val" id="d-venc" style="font-size:14px">—</div></div>
+      <div class="ph"><div class="pt">Dashboard</div><div class="ps" id="dash-month-label"></div></div>
+      <div class="mg">
+        <div class="mc"><div class="mi p">$</div><div class="mb"><div class="lbl">Total a pagar</div><div class="val" id="d-total">$0</div></div></div>
+        <div class="mc"><div class="mi a">!</div><div class="mb"><div class="lbl">Mínimos</div><div class="val warn" id="d-min">$0</div></div></div>
+        <div class="mc"><div class="mi b">U$</div><div class="mb"><div class="lbl">En dólares</div><div class="val" id="d-usd">U$S 0</div></div></div>
+        <div class="mc"><div class="mi r">cal</div><div class="mb"><div class="lbl">Próx. vencimiento</div><div class="val" id="d-venc" style="font-size:15px">—</div></div></div>
       </div>
-      <div id="dash-two-col" style="display:grid;grid-template-columns:1fr;gap:1rem">
-        <div class="card">
-          <div class="card-title">Mis tarjetas — <span style="font-family:var(--mono);font-size:11px;color:var(--text2)" id="dash-month-label"></span></div>
-          <div id="dash-cards"><div class="empty">Sin datos</div></div>
+      <div class="two-col" id="dash-two-col" style="grid-template-columns:1fr">
+        <div class="vc">
+          <div class="vct">Mis tarjetas</div>
+          <div id="dash-cards"><div class="empty">Sin datos para este mes</div></div>
         </div>
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0">
-            <span style="font-size:13px;font-weight:500">Extensiones del mes</span>
-            <button onclick="toggleDashExt()" id="dash-ext-btn" class="btn sm" style="font-size:11px">Mostrar</button>
+        <div class="vc">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <div class="vct">Extensiones del mes</div>
+            <button onclick="toggleDashExt()" id="dash-ext-btn" class="btn sm">Mostrar</button>
           </div>
-          <div id="dash-ext" style="display:none;margin-top:10px"><div class="empty">Sin extensiones</div></div>
+          <div id="dash-ext" style="display:none"><div class="empty">Sin extensiones</div></div>
         </div>
       </div>
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div class="vc">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1rem">
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:13px;font-weight:500">Gastos nuevos este mes</span>
-            <span class="badge new" style="font-size:10px">vs mes anterior</span>
+            <span class="vct">Gastos nuevos este mes</span>
+            <span class="badge new">vs mes anterior</span>
           </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <select id="new-filter-card" onchange="filterNewExpenses()" style="font-size:12px;padding:4px 8px;width:160px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="new-filter-card" onchange="filterNewExpenses()" style="font-size:12px;padding:5px 10px;width:170px">
               <option value="">Todas las tarjetas</option>
             </select>
-            <button onclick="toggleNewExpenses()" id="new-toggle-btn" class="btn sm" style="font-size:11px">Mostrar</button>
+            <button onclick="toggleNewExpenses()" id="new-toggle-btn" class="btn sm op">Mostrar</button>
           </div>
         </div>
         <div id="dash-new" style="display:none"><div class="empty">Sin gastos nuevos detectados</div></div>
@@ -268,12 +222,14 @@
 
     <!-- CARGAR RESUMEN -->
     <div class="section" id="s-cargar">
-      <div class="card">
-        <div class="card-title">Subir resumen de tarjeta</div>
+      <div class="ph"><div class="pt">Cargar resumen</div></div>
+      <div class="vc">
+        <div class="vct">Subir archivo</div>
+        <div class="vcs">PDF e imágenes. Los PDFs con contraseña se desencriptan automáticamente.</div>
         <div class="upload-zone" onclick="document.getElementById('file-inp').click()" id="drop-zone">
-          <div class="icon">↑</div>
-          <div>Tocá para subir imagen o PDF del resumen</div>
-          <div class="hint">JPG · PNG · PDF</div>
+          <div class="uzi">↑</div>
+          <div style="font-weight:500">Tocá para subir imagen o PDF del resumen</div>
+          <div class="uzh">JPG · PNG · PDF</div>
         </div>
         <input type="file" id="file-inp" accept="image/*,application/pdf" style="display:none" onchange="handleFile(this)">
         <div class="form-row">
@@ -282,13 +238,13 @@
         </div>
         <button class="btn primary" onclick="extractWithAI()" id="extract-btn">Extraer datos con IA</button>
       </div>
-      <div class="card">
-        <div class="card-title">Resultado de extracción</div>
-        <div class="ai-output" id="ai-output">Los datos extraídos aparecerán aquí...</div>
+      <div class="vc">
+        <div class="vct">Resultado de extracción</div>
+        <div class="aio" id="ai-output">Los datos extraídos aparecerán aquí...</div>
         <button class="btn primary" onclick="confirmExtraction()" id="confirm-btn" style="display:none">Confirmar y guardar</button>
       </div>
-      <div class="card">
-        <div class="card-title">Cargar manualmente</div>
+      <div class="vc">
+        <div class="vct">Cargar manualmente</div>
         <div class="form-row">
           <div class="form-col"><label>Tarjeta</label><select id="m-card"></select></div>
           <div class="form-col"><label>Mes / Año</label><input type="month" id="m-month"></div>
@@ -302,7 +258,7 @@
           <div class="form-col"><label>Total USD</label><input type="number" id="m-usd" placeholder="0"></div>
         </div>
         <div style="margin-top:8px">
-          <div class="section-label">Extensiones en este resumen</div>
+          <div class="slbl">Extensiones en este resumen</div>
           <div id="manual-ext-list"></div>
           <button class="btn sm" onclick="addManualExt()" style="margin-top:6px">+ Extensión</button>
         </div>
@@ -313,8 +269,9 @@
 
     <!-- TARJETAS -->
     <div class="section" id="s-tarjetas">
-      <div class="card" id="card-form-section">
-        <div class="card-title" id="card-form-title">Nueva tarjeta</div>
+      <div class="ph"><div class="pt">Mis tarjetas</div></div>
+      <div class="vc" id="card-form-section">
+        <div class="vct" id="card-form-title">Nueva tarjeta</div>
         <div class="form-row">
           <div class="form-col"><label>Nombre</label><input id="tc-name" placeholder="VISA Galicia"></div>
           <div class="form-col"><label>Banco</label><input id="tc-bank" placeholder="Galicia"></div>
@@ -329,28 +286,26 @@
           <button class="btn" id="card-cancel-btn" onclick="cancelEditCard()" style="display:none">Cancelar</button>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">Mis tarjetas</div>
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <input type="text" id="cards-filter" placeholder="Filtrar por banco o nombre..." oninput="renderCards()" style="max-width:280px">
-        </div>
+      <div class="vc">
+        <div class="vct" style="margin-bottom:12px">Listado</div>
+        <input type="text" id="cards-filter" placeholder="Filtrar por banco o nombre..." oninput="renderCards()" style="max-width:280px;margin-bottom:14px">
         <div id="cards-list"><div class="empty">Sin tarjetas</div></div>
       </div>
     </div>
 
     <!-- EXTENSIONES -->
     <div class="section" id="s-extensiones">
-      <div class="card">
-        <div class="card-title">Titulares de extensiones</div>
-        <div class="form-row">
-          <div class="form-col"><label>Nombre</label><input id="ext-name" placeholder="Martín"></div>
-        </div>
+      <div class="ph"><div class="pt">Extensiones</div></div>
+      <div class="vc">
+        <div class="vct">Titulares de extensiones</div>
+        <div class="vcs">Registrá a quiénes les diste extensiones de tus tarjetas.</div>
+        <div class="form-row"><div class="form-col"><label>Nombre</label><input id="ext-name" placeholder="Martín"></div></div>
         <button class="btn primary" onclick="addExtHolder()">Agregar titular</button>
         <hr>
         <div id="ext-holders-list"><div class="empty">Sin titulares</div></div>
       </div>
-      <div class="card">
-        <div class="card-title">Resumen por titular</div>
+      <div class="vc">
+        <div class="vct">Resumen por titular</div>
         <div class="form-row" style="margin-bottom:12px">
           <div class="form-col" style="max-width:200px"><label>Mes</label><input type="month" id="ext-filter-month" onchange="renderExtSummary()"></div>
         </div>
@@ -360,20 +315,21 @@
 
     <!-- GASTOS EXTRA -->
     <div class="section" id="s-gastos">
+      <div class="ph"><div class="pt">Gastos extra</div></div>
       <div class="tabs2">
         <button class="active" onclick="gastosTab(this,'ge-propio')">Propios</button>
         <button onclick="gastosTab(this,'ge-terceros')">A terceros</button>
       </div>
       <div id="ge-propio">
-        <div class="card">
-          <div class="card-title">Agregar gasto extra</div>
+        <div class="vc">
+          <div class="vct">Agregar gasto extra</div>
           <div class="form-row">
             <div class="form-col"><label>Descripción</label><input id="ge-desc" placeholder="Alquiler"></div>
             <div class="form-col"><label>Monto</label><input type="number" id="ge-amount" placeholder="0"></div>
           </div>
           <div class="form-row">
             <div class="form-col"><label>Categoría</label><select id="ge-cat"></select></div>
-            <div class="form-col"><label>Moneda</label><select id="ge-curr"><option value="ARS">$</option><option value="USD">U$S</option></select></div>
+            <div class="form-col"><label>Moneda</label><select id="ge-curr"><option value="ARS">$ Pesos</option><option value="USD">U$S Dólares</option></select></div>
           </div>
           <div class="form-row">
             <div class="form-col"><label>Fecha</label><input type="date" id="ge-date"></div>
@@ -381,18 +337,18 @@
           </div>
           <button class="btn primary" onclick="addGasto()">Agregar</button>
         </div>
-        <div class="card">
-          <div class="card-title">Gastos extras propios</div>
-          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <div class="vc">
+          <div class="vct" style="margin-bottom:12px">Gastos extras propios</div>
+          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
             <input type="month" id="gf-month" onchange="renderGastos()" style="width:160px">
-            <select id="gf-cat" onchange="renderGastos()" style="width:180px"><option value="">Todas las categorías</option></select>
+            <select id="gf-cat" onchange="renderGastos()" style="width:190px"><option value="">Todas las categorías</option></select>
           </div>
           <div id="gastos-list"><div class="empty">Sin gastos</div></div>
         </div>
       </div>
       <div id="ge-terceros" style="display:none">
-        <div class="card">
-          <div class="card-title">Gasto a tercero</div>
+        <div class="vc">
+          <div class="vct">Gasto a tercero</div>
           <div class="form-row">
             <div class="form-col"><label>Titular</label><select id="gt-holder"></select></div>
             <div class="form-col"><label>Descripción</label><input id="gt-desc" placeholder="Regatas"></div>
@@ -407,9 +363,9 @@
           </div>
           <button class="btn primary" onclick="addGastoTercero()">Agregar</button>
         </div>
-        <div class="card">
-          <div class="card-title">Gastos a terceros</div>
-          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <div class="vc">
+          <div class="vct" style="margin-bottom:12px">Gastos a terceros</div>
+          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
             <input type="month" id="gtf-month" onchange="renderGastosTerceros()" style="width:160px">
             <select id="gtf-holder" onchange="renderGastosTerceros()" style="width:160px"><option value="">Todos</option></select>
           </div>
@@ -420,34 +376,32 @@
 
     <!-- CATEGORIAS -->
     <div class="section" id="s-categorias">
-      <div class="two-col">
-        <div class="card">
-          <div class="card-title">Categorías</div>
-          <div class="form-row"><div class="form-col"><label>Nueva</label><input id="cat-new" placeholder="Educación"></div></div>
+      <div class="ph"><div class="pt">Categorías</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <div class="vc">
+          <div class="vct">Gestionar categorías</div>
+          <div class="form-row"><div class="form-col"><label>Nueva categoría</label><input id="cat-new" placeholder="Educación"></div></div>
           <button class="btn primary" onclick="addCategory()">Agregar</button>
           <hr>
           <div id="cats-list"></div>
         </div>
-        <div class="card">
-          <div class="card-title">Gastos por categoría</div>
-          <input type="month" id="cat-month-filter" onchange="renderCatSummary()" style="width:160px;margin-bottom:12px">
+        <div class="vc">
+          <div class="vct">Gastos por categoría</div>
+          <input type="month" id="cat-month-filter" onchange="renderCatSummary()" style="width:160px;margin-bottom:14px">
           <div id="cat-summary"><div class="empty">Seleccioná un mes</div></div>
         </div>
       </div>
     </div>
 
-
     <!-- HISTORICO -->
     <div class="section" id="s-historico">
-      <div class="card">
-        <div class="card-title">Histórico de resúmenes cargados</div>
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <select id="hf-card" onchange="renderHistorico()" style="width:180px"><option value="">Todas las tarjetas</option></select>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Desde</label><input type="month" id="hf-from" onchange="renderHistorico()" style="width:150px"></div>
-            <div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Hasta</label><input type="month" id="hf-to" onchange="renderHistorico()" style="width:150px"></div>
-            <button class="btn sm" onclick="clearHistoricoFilters()" style="margin-top:14px">Limpiar</button>
-          </div>
+      <div class="ph"><div class="pt">Histórico de resúmenes</div></div>
+      <div class="vc">
+        <div style="display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end">
+          <div><div class="flbl">Tarjeta</div><select id="hf-card" onchange="renderHistorico()" style="width:190px"><option value="">Todas las tarjetas</option></select></div>
+          <div><div class="flbl">Desde</div><input type="month" id="hf-from" onchange="renderHistorico()" style="width:155px"></div>
+          <div><div class="flbl">Hasta</div><input type="month" id="hf-to" onchange="renderHistorico()" style="width:155px"></div>
+          <button class="btn sm" onclick="clearHistoricoFilters()" style="margin-bottom:1px">Limpiar</button>
         </div>
         <div id="historico-list"><div class="empty">Sin resúmenes cargados</div></div>
       </div>
@@ -455,12 +409,11 @@
 
     <!-- CONFIG -->
     <div class="section" id="s-config">
-      <div class="card">
-        <div class="card-title">Google Sheets</div>
-        <div id="sheets-status" class="sheet-status ok" style="margin-bottom:12px;display:inline-block">conectado</div>
-        <div class="form-row">
-          <div class="form-col"><label>Client ID</label><input id="cfg-client-id2" type="text"></div>
-        </div>
+      <div class="ph"><div class="pt">Configuración</div></div>
+      <div class="vc">
+        <div class="vct">Google Sheets</div>
+        <div id="sheets-status" class="sts ok" style="margin-bottom:14px;display:inline-block">conectado</div>
+        <div class="form-row"><div class="form-col"><label>Client ID</label><input id="cfg-client-id2" type="text"></div></div>
         <div class="form-row">
           <div class="form-col"><label>API Key</label><input id="cfg-api-key2" type="text"></div>
           <div class="form-col"><label>Spreadsheet ID</label><input id="cfg-sheet-id2" type="text"></div>
@@ -470,14 +423,13 @@
           <button class="btn" onclick="manualSync()">↻ Sincronizar ahora</button>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">Tipo de cambio</div>
-        <div class="form-row">
-          <div class="form-col" style="max-width:200px"><label>1 USD = $ (pesos)</label><input type="number" id="fx-rate" placeholder="1200" oninput="saveFX()"></div>
-        </div>
+      <div class="vc">
+        <div class="vct">Tipo de cambio</div>
+        <div class="form-row"><div class="form-col" style="max-width:220px"><label>1 USD = $ (pesos)</label><input type="number" id="fx-rate" placeholder="1200" oninput="saveFX()"></div></div>
+        <p style="font-size:12px;color:var(--text2)">Usado para calcular equivalencias cuando hay deuda en USD.</p>
       </div>
-      <div class="card">
-        <div class="card-title">Backup local</div>
+      <div class="vc">
+        <div class="vct">Backup local</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn primary" onclick="exportToJSON()">Descargar JSON</button>
           <button class="btn" onclick="document.getElementById('import-inp').click()">Importar JSON</button>
@@ -490,24 +442,15 @@
   </main>
 </div>
 
-<!-- pdf-lib for password-protected PDFs -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>
-  // pdf.js from cdnjs exposes window.pdfjsLib directly
-  // Disable worker to avoid CORS issues on static hosting
-  if (window.pdfjsLib) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-  }
-</script>
-
-<!-- Google APIs -->
+<script>if(window.pdfjsLib){window.pdfjsLib.GlobalWorkerOptions.workerSrc='';}</script>
 <script src="https://apis.google.com/js/api.js"></script>
 <script src="https://accounts.google.com/gsi/client"></script>
 <script src="sheets.js"></script>
 <script src="app.js"></script>
 <script>
   loadCfg();
-  if (cfg.clientId && cfg.apiKey && cfg.sheetId) { useSheets = true; launchApp(); }
+  if(cfg.clientId&&cfg.apiKey&&cfg.sheetId){useSheets=true;launchApp();}
 </script>
 </body>
 </html>
