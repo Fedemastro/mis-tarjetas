@@ -1066,6 +1066,10 @@ function renderHistorico() {
       ? '<table style="width:100%;font-size:12px"><thead><tr><th>Descripcion</th><th>Categoria</th><th style="text-align:right">Monto</th></tr></thead><tbody>' + expRows + '</tbody></table>' + extHtml
       : '<div style="font-size:12px;color:var(--text2)">Sin detalle guardado</div>' + extHtml;
 
+    var driveCell = s.driveLink
+      ? '<a href="' + s.driveLink + '" target="_blank" onclick="event.stopPropagation()" title="Ver en Drive" style="display:inline-flex;align-items:center;gap:4px;color:var(--purple);text-decoration:none;font-size:12px;font-weight:500"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Ver</a>'
+      : '<span style="color:var(--text3);font-size:12px">-</span>';
+
     rows += '<tr style="cursor:pointer" onclick="toggleHistoricoRow(\'' + sid + '\', this)">' +
       '<td style="color:var(--text2);font-size:12px" id="arr-' + sid + '">&#9654;</td>' +
       '<td><b>' + card.name + '</b></td>' +
@@ -1073,9 +1077,10 @@ function renderHistorico() {
       '<td style="color:var(--text2);font-size:12px">' + dateStr + (timeStr ? ' ' + timeStr : '') + '</td>' +
       '<td class="num" style="text-align:right">$' + fmt(s.total || 0) + '</td>' +
       '<td class="num" style="text-align:right">' + (Number(s.totalUSD) > 0 ? 'U$S ' + fmt(s.totalUSD) : '-') + '</td>' +
+      '<td>' + driveCell + '</td>' +
       '<td><button class="btn danger sm" onclick="event.stopPropagation();delSummary(\'' + sid + '\')">x</button></td>' +
     '</tr>' +
-    '<tr id="det-' + sid + '" style="display:none"><td colspan="7" style="padding:0">' +
+    '<tr id="det-' + sid + '" style="display:none"><td colspan="8" style="padding:0">' +
       '<div style="background:var(--surface2);padding:12px 16px;border-bottom:1px solid var(--border)">' +
         detailContent +
       '</div>' +
