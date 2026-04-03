@@ -819,7 +819,7 @@ async function extractWithAI() {
     const resp = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2000, messages: [{ role: 'user', content: userContent }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: userContent }] })
     });
     const data = await resp.json();
     if (data.error || !data.content) {
@@ -833,6 +833,13 @@ async function extractWithAI() {
     var firstBrace = clean.indexOf('{');
     var lastBrace = clean.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1) clean = clean.slice(firstBrace, lastBrace + 1);
+    // Fix Argentine number format: replace "105.923,00" with "105923.00"
+    // Only inside JSON number values (after : and in arrays)
+    clean = clean.replace(/:\s*(-?)(\d{1,3}(?:\.\d{3})*),(\d{2})(?=[,\}\]])/g, function(m, sign, int, dec) {
+      return ': ' + sign + int.replace(/\./g, '') + '.' + dec;
+    });
+    // Also fix numbers without thousands separator but with comma decimal
+    clean = clean.replace(/:\s*(-?\d+),(\d{2})(?=[,\}\]])/g, ': $1.$2');
     try {
       pendingExtraction = JSON.parse(clean);
       out.textContent = JSON.stringify(pendingExtraction, null, 2);
