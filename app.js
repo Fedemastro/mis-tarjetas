@@ -1,6 +1,8 @@
 // app.js - logica principal de la app
 
 const PROXY_URL = 'https://claudeworker.fedemusic2008.workers.dev';
+// Token secreto — tiene que coincidir con AUTH_TOKEN en Cloudflare
+const AUTH_TOKEN = '445daa74-08f5-4f4d-a6d3-29d6191804e1';
 
 let db = {
   cards: [], extHolders: [], summaries: [],
@@ -698,7 +700,7 @@ async function decryptPDF(arrayBuf, password) {
 
   var resp = await fetch(PROXY_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Action': 'decrypt-pdf' },
+    headers: { 'Content-Type': 'application/json', 'X-Action': 'decrypt-pdf', 'X-Auth-Token': AUTH_TOKEN },
     body: JSON.stringify({ pdfBase64: b64, password: password })
   });
 
@@ -813,7 +815,7 @@ async function extractWithAI() {
   try {
     const resp = await fetch(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': AUTH_TOKEN },
       body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: userContent }] })
     });
     const data = await resp.json();
