@@ -16,7 +16,7 @@ let gapiInited = false;
 let tokenClient = null;
 let isAuthorized = false;
 
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
 
 // ─── Token persistence ─────────────────────────────────────────────────────
 
@@ -96,6 +96,73 @@ function sheetsSignOut() {
   clearSavedToken();
 }
 
+
+// ─── Google Drive file upload ──────────────────────────────────────────────
+
+async function uploadToDrive(fileName, fileBase64, mimeType, folderPath) {
+  if (!isAuthorized) return null;
+  try {
+    // Find or create folder structure: Mis Tarjetas / Resumenes / YYYY-MM
+    const rootFolderId = await findOrCreateFolder('Mis Tarjetas', null);
+    const subFolderId  = await findOrCreateFolder('Resumenes', rootFolderId);
+    const monthFolder  = await findOrCreateFolder(folderPath, subFolderId);
+
+    // Upload file using multipart
+    const boundary = 'misttarjetas_boundary';
+    const metadata = JSON.stringify({ name: fileName, parents: [monthFolder] });
+
+    // Decode base64 to binary
+    const binaryStr = atob(fileBase64);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+    // Build multipart body
+    const metaPart = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + metadata + '\r\n';
+    const filePart = '--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\nContent-Transfer-Encoding: base64\r\n\r\n' + fileBase64 + '\r\n--' + boundary + '--';
+    const body = metaPart + filePart;
+
+    const token = gapi.client.getToken();
+    const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token.access_token,
+        'Content-Type': 'multipart/related; boundary=' + boundary,
+      },
+      body: body
+    });
+    const data = await resp.json();
+    return data.id ? { id: data.id, link: data.webViewLink } : null;
+  } catch(e) {
+    console.warn('Drive upload error', e);
+    return null;
+  }
+}
+
+async function findOrCreateFolder(name, parentId) {
+  const token = gapi.client.getToken();
+  // Search for existing folder
+  let q = "mimeType='application/vnd.google-apps.folder' and name='" + name.replace(/'/g, "\'") + "' and trashed=false";
+  if (parentId) q += " and '" + parentId + "' in parents";
+
+  const searchResp = await fetch(
+    'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id)',
+    { headers: { 'Authorization': 'Bearer ' + token.access_token } }
+  );
+  const searchData = await searchResp.json();
+  if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
+
+  // Create folder
+  const meta = { name: name, mimeType: 'application/vnd.google-apps.folder' };
+  if (parentId) meta.parents = [parentId];
+  const createResp = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token.access_token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(meta)
+  });
+  const createData = await createResp.json();
+  return createData.id;
+}
+
 // ─── Ensure sheet tabs exist ───────────────────────────────────────────────
 
 async function ensureSheets(spreadsheetId) {
@@ -152,13 +219,15 @@ function rowsToCards(rows) {
 }
 
 function summariesToRows(summaries) {
-  const h = ['id','cardId','cardName','month','vencimiento','minimo','total','totalUSD','ownExpenses','extensions','uploadedAt'];
+  const h = ['id','cardId','cardName','month','vencimiento','minimo','total','totalUSD','ownExpenses','extensions','uploadedAt','driveFileId','driveLink'];
   return [h, ...summaries.map(s => [
     s.id, s.cardId, s.cardName, s.month, s.vencimiento,
     s.minimo, s.total, s.totalUSD,
     JSON.stringify(s.ownExpenses || []),
     JSON.stringify(s.extensions || []),
-    s.uploadedAt || ''
+    s.uploadedAt || '',
+    s.driveFileId || '',
+    s.driveLink || ''
   ])];
 }
 function rowsToSummaries(rows) {
