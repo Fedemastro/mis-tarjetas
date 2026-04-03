@@ -123,7 +123,7 @@ function initDefaults() {
   const now = new Date();
   const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
   const today = now.toISOString().slice(0, 10);
-  ['m-month','ge-month','gt-month','upload-month','ext-filter-month','gf-month','gtf-month','cat-month-filter'].forEach(id => {
+  ['m-month','ge-month','gt-month','upload-month','ext-filter-month','gf-month','gtf-month','cat-month-filter','dash-month-sel'].forEach(id => {
     const el = document.getElementById(id);
     if (el && el.type === 'month' && !el.value) el.value = ym;
   });
@@ -307,11 +307,13 @@ function renderDashboard() {
     if (!extData[g.holder]) extData[g.holder] = { fromSummary: 0, fromManual: 0 };
     extData[g.holder].fromManual += Number(g.amount||0);
   });
-  // Only show registered extension holders, not the main cardholder
+  // Only show holders that are explicitly registered in extHolders
   var registeredHolders = db.extHolders.map(function(h){ return h.name.toLowerCase().trim(); });
-  var extKeys = Object.keys(extData).filter(function(k) {
-    return registeredHolders.length === 0 || registeredHolders.indexOf(k.toLowerCase().trim()) !== -1;
-  });
+  var extKeys = registeredHolders.length > 0
+    ? Object.keys(extData).filter(function(k) {
+        return registeredHolders.indexOf(k.toLowerCase().trim()) !== -1;
+      })
+    : Object.keys(extData);
   var extBtn = document.getElementById('dash-ext-btn');
   if (extBtn) extBtn.textContent = extKeys.length ? ('Mostrar (' + extKeys.length + ')') : 'Mostrar';
   if (!extKeys.length) {
