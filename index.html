@@ -436,7 +436,32 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
           <input type="file" id="import-inp" accept=".json" style="display:none" onchange="loadJSON(this)">
         </div>
       </div>
-    <!-- EXTENSIONES -->
+      <!-- TARJETAS -->
+      <div id="cfg-tarjetas" style="display:none">
+        <div class="vc" id="card-form-section">
+          <div class="vct" id="card-form-title">Nueva tarjeta</div>
+          <div class="form-row">
+            <div class="form-col"><label>Nombre</label><input id="tc-name" placeholder="VISA Galicia"></div>
+            <div class="form-col"><label>Banco</label><input id="tc-bank" placeholder="Galicia"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-col"><label>Tipo</label><select id="tc-type"><option value="VISA">VISA</option><option value="Mastercard">Mastercard</option><option value="American Express">American Express</option><option value="Naranja">Naranja</option><option value="Otro">Otro</option></select></div>
+            <div class="form-col"><label>Débito automático mínimo</label><select id="tc-auto"><option value="no">No</option><option value="yes">Sí</option></select></div>
+          </div>
+          <input type="hidden" id="tc-edit-id">
+          <div style="display:flex;gap:8px">
+            <button class="btn primary" id="card-save-btn" onclick="saveCard()">Agregar tarjeta</button>
+            <button class="btn" id="card-cancel-btn" onclick="cancelEditCard()" style="display:none">Cancelar</button>
+          </div>
+        </div>
+        <div class="vc">
+          <div class="vct" style="margin-bottom:12px">Listado</div>
+          <input type="text" id="cards-filter" placeholder="Filtrar por banco o nombre..." oninput="renderCards()" style="max-width:280px;margin-bottom:14px">
+          <div id="cards-list"><div class="empty">Sin tarjetas</div></div>
+        </div>
+      </div>
+
+      <!-- EXTENSIONES -->
       <div id="cfg-extensiones" style="display:none">
         <div class="vc">
           <div class="vct">Titulares de extensiones</div>
