@@ -56,15 +56,18 @@ async function manualSync() {
   if (!useSheets || !isAuthorized) { alert('Conecta Google Sheets primero'); return; }
   setSyncStatus('syncing', 'sincronizando...');
   document.getElementById('sync-btn').disabled = true;
+  // Pull first to get remote data
   const remote = await pullFromSheets(cfg.sheetId);
   if (remote) {
-    console.log('Sheets sync - summaries count:', remote.summaries ? remote.summaries.length : 0);
-    if (remote.summaries) remote.summaries.forEach(function(s){ console.log(' -', s.cardName, s.month, s.id); });
+    // Merge remote into local (remote wins)
     db = { ...db, ...remote };
     saveLocal();
+    // Push back to update headers and any missing columns
+    await pushToSheets(cfg.sheetId, db);
     renderCurrentSection();
-    setSyncStatus('ok', 'sincronizado (' + (remote.summaries ? remote.summaries.length : 0) + ' res.)');
+    setSyncStatus('ok', 'sincronizado');
   } else {
+    // Nothing in Sheets yet — push everything
     const ok = await pushToSheets(cfg.sheetId, db);
     setSyncStatus(ok ? 'ok' : 'error', ok ? 'sincronizado' : 'error');
   }
