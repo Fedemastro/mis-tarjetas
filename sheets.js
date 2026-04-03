@@ -138,6 +138,27 @@ async function uploadToDrive(fileName, fileBase64, mimeType, folderPath) {
   }
 }
 
+
+async function moveToTrashDrive(fileId) {
+  if (!isAuthorized || !fileId) return false;
+  try {
+    const token = gapi.client.getToken();
+    // Move to trash (recoverable)
+    const resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'Bearer ' + token.access_token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ trashed: true })
+    });
+    return resp.ok;
+  } catch(e) {
+    console.warn('Drive trash error', e);
+    return false;
+  }
+}
+
 async function findOrCreateFolder(name, parentId) {
   const token = gapi.client.getToken();
   // Search for existing folder
