@@ -811,7 +811,8 @@ async function extractWithAI() {
     '4. currency=USD si el monto figura en la columna DOLARES o dice USD. currency=ARS si figura en pesos.\n' +
     '5. Para cuotas: buscar patrones como C.03/12 o 3/12 o cuota 3 de 12. cuotaActual=3, cuotas=12.\n' +
     '6. Las extensiones tienen su propia seccion con el nombre del titular.\n' +
-    '7. minimo y total son los valores que figuran explicitamente en el resumen como PAGO MINIMO y SALDO ACTUAL.';
+    '7. minimo y total son los valores que figuran explicitamente en el resumen como PAGO MINIMO y SALDO ACTUAL.\n' +
+    '8. Si hay muchos gastos, incluirlos todos de todas formas. Usar descripciones cortas (max 30 caracteres). No omitir ningun gasto.';
 
   userContent.push({ type: 'text', text: prompt });
 
@@ -819,7 +820,7 @@ async function extractWithAI() {
     const resp = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: userContent }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: userContent }] })
     });
     const data = await resp.json();
     if (data.error || !data.content) {
