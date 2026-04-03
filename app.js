@@ -264,7 +264,15 @@ function renderDashboard() {
       var extra = Number(s.total||0) - Number(s.minimo||0);
       var days = daysUntil(s.vencimiento);
       var payment = (db.payments && db.payments[s.id]) ? db.payments[s.id] : {};
-      var isPaid = !!(payment.ars || payment.usd);
+      var paidARS = Number(payment.ars || 0);
+      var paidUSD = Number(payment.usd || 0);
+      var totalARS = Number(s.total || 0);
+      var totalUSD2 = Number(s.totalUSD || 0);
+      var isPaid = payment.full ||
+        (paidARS >= totalARS && (totalUSD2 === 0 || paidUSD >= totalUSD2));
+      var isPartial = !isPaid && (paidARS > 0 || paidUSD > 0);
+      var restanteARS = Math.max(0, totalARS - paidARS);
+      var restanteUSD = Math.max(0, totalUSD2 - paidUSD);
       var vencBadge = days === null ? '' :
         days < 0  ? '<span class="badge red"   style="font-size:10px;margin-left:4px">vencida</span>' :
         days === 0 ? '<span class="badge red"   style="font-size:10px;margin-left:4px">hoy</span>' :
@@ -282,7 +290,16 @@ function renderDashboard() {
           '<div class="num" style="color:var(--amber)">$' + fmt(s.minimo||0) + (card.autoDebit==='yes' ? ' <span style="font-size:10px;color:var(--text2)">(auto)</span>' : '') + '</div>' +
           (card.autoDebit==='yes' && extra>0 ? '<div style="font-size:10px;color:var(--amber);margin-top:1px">+$' + fmt(extra) + ' sobre mín.</div>' : '') +
         '</td>' +
-        '<td>' + (isPaid ? '<span class="badge green" style="font-size:11px">pagada</span>' : '<span class="badge gray" style="font-size:11px">pendiente</span>') + '</td>' +
+        '<td style="text-align:right">' +
+          (restanteARS > 0 ? '<div class="num" style="font-size:13px">$' + fmt(restanteARS) + '</div>' : '') +
+          (restanteUSD > 0 ? '<div style="font-size:11px;color:var(--text2)">U$S ' + fmt(restanteUSD) + '</div>' : '') +
+          (isPaid ? '<div style="font-size:10px;color:var(--green)">pagado</div>' : '') +
+        '</td>' +
+        '<td>' +
+          (isPaid ? '<span class="badge green" style="font-size:11px">pagada</span>' :
+           isPartial ? '<span class="badge amber" style="font-size:11px">parcial</span>' :
+           '<span class="badge gray" style="font-size:11px">pendiente</span>') +
+        '</td>' +
         '<td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">' +
           '<input type="number" placeholder="$" value="' + (payment.ars||'') + '" style="width:88px;font-size:12px;padding:4px 8px" id="pay-ars-' + s.id + '" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)">' +
           (Number(s.totalUSD)>0 ? '<input type="number" placeholder="U$S" value="' + (payment.usd||'') + '" style="width:70px;font-size:12px;padding:4px 8px" id="pay-usd-' + s.id + '" data-sid="' + s.id + '" oninput="savePayment(this.dataset.sid)">' : '<input type="hidden" id="pay-usd-' + s.id + '" value="' + (payment.usd||'') + '">') +
