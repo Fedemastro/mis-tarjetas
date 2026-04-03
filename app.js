@@ -237,7 +237,14 @@ function renderDashboard() {
     totalARS += Number(s.total || 0);
     totalMin += Number(s.minimo || 0);
     totalUSD += Number(s.totalUSD || 0);
-    if (s.vencimiento) {
+    // Only consider pending cards for próx vencimiento
+    var payment = (db.payments && db.payments[s.id]) ? db.payments[s.id] : {};
+    var paidARS = Number(payment.ars || 0);
+    var paidUSD = Number(payment.usd || 0);
+    var sTotal = Number(s.total || 0);
+    var sTotalUSD = Number(s.totalUSD || 0);
+    var sIsPaid = payment.full || (paidARS >= sTotal && (sTotalUSD === 0 || paidUSD >= sTotalUSD));
+    if (!sIsPaid && s.vencimiento) {
       var d = new Date(s.vencimiento + 'T00:00:00');
       if (!nextVenc || d < nextVenc) { nextVenc = d; nextDays = daysUntil(s.vencimiento); }
     }
@@ -332,10 +339,10 @@ function renderDashboard() {
     extData[g.holder].fromManual += Number(g.amount||0);
   });
   // Only show holders that are explicitly registered in extHolders
-  var registeredHolders = db.extHolders.map(function(h){ return h.name.toLowerCase().trim(); });
+  var registeredHolders = db.extHolders.map(function(h){ return (h.name||'').toLowerCase().trim(); }).filter(Boolean);
   var extKeys = registeredHolders.length > 0
     ? Object.keys(extData).filter(function(k) {
-        return registeredHolders.indexOf(k.toLowerCase().trim()) !== -1;
+        return registeredHolders.indexOf((k||'').toLowerCase().trim()) !== -1;
       })
     : Object.keys(extData);
   var extBtn = document.getElementById('dash-ext-btn');
@@ -359,13 +366,14 @@ function renderDashboard() {
   var prevYM = getPrevMonth(ym);
   var prevDescs = {};
   db.summaries.filter(function(s){ return s.month === prevYM; }).forEach(function(s) {
-    (s.ownExpenses||[]).forEach(function(e){ prevDescs[e.desc.toLowerCase().trim()] = true; });
+    (s.ownExpenses||[]).forEach(function(e){ var d = (e.desc||e.d||'').toLowerCase().trim(); if(d) prevDescs[d] = true; });
   });
   _newItems = [];
   ms.forEach(function(s) {
     (s.ownExpenses||[]).forEach(function(e) {
-      if (!prevDescs[e.desc.toLowerCase().trim()]) {
-        _newItems.push({ desc: e.desc, amount: e.amount, currency: e.currency, card: s.cardName||'', cardId: s.cardId });
+      var ed = (e.desc||e.d||'').toLowerCase().trim();
+      if (ed && !prevDescs[ed]) {
+        _newItems.push({ desc: e.desc||e.d||'-', amount: e.amount||e.a||0, currency: e.currency||e.cu||'ARS', card: s.cardName||'', cardId: s.cardId });
       }
     });
   });
