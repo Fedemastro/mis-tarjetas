@@ -1084,6 +1084,7 @@ function renderHistorico() {
       '<th style="text-align:right">Total $</th>' +
       '<th style="text-align:right">Total U$S</th>' +
       '<th>Drive</th>' +
+      '<th></th>' +
     '</tr></thead>' +
     '<tbody>' + rows + '</tbody>' +
     '</table></div>';
@@ -1099,8 +1100,16 @@ function toggleHistoricoRow(id, tr) {
 
 function delSummary(id) {
   if (!confirm('Eliminar este resumen? Esta accion no se puede deshacer.')) return;
-  db.summaries = db.summaries.filter(s => s.id !== id);
-  saveAndSync(); renderHistorico();
+  var summary = db.summaries.find(function(s){ return s.id === id; });
+  db.summaries = db.summaries.filter(function(s){ return s.id !== id; });
+  saveAndSync();
+  // Move Drive file to trash if exists
+  if (summary && summary.driveFileId && useSheets && isAuthorized) {
+    moveToTrashDrive(summary.driveFileId).then(function(ok) {
+      if (!ok) console.warn('No se pudo mover a la papelera de Drive el archivo:', summary.driveFileId);
+    });
+  }
+  renderHistorico();
 }
 
 
