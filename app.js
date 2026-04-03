@@ -1089,7 +1089,7 @@ function renderHistorico() {
       '<th style="text-align:right">Total $</th>' +
       '<th style="text-align:right">Total U$S</th>' +
       '<th>Drive</th>' +
-      '<th></th>' +
+      '<th>Eliminar</th>' +
     '</tr></thead>' +
     '<tbody>' + rows + '</tbody>' +
     '</table></div>';
