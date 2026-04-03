@@ -64,7 +64,12 @@ async function manualSync() {
     saveLocal();
     // Push back to update headers and any missing columns
     await pushToSheets(cfg.sheetId, db);
+    // Repopulate all selects with updated data
+    populateCardSelects();
+    populateGastoCats();
+    populateGastoTerceroSelects();
     renderCurrentSection();
+    renderDashboard();
     setSyncStatus('ok', 'sincronizado');
   } else {
     // Nothing in Sheets yet — push everything
@@ -105,7 +110,12 @@ function launchApp() {
         setSyncStatus('syncing', 'cargando...');
         const remote = await pullFromSheets(cfg.sheetId);
         if (remote) { db = { ...db, ...remote }; saveLocal(); }
+        populateCardSelects();
+        populateGastoCats();
+        populateGastoTerceroSelects();
+        renderCats();
         renderCurrentSection();
+        renderDashboard();
         setSyncStatus('ok', 'sincronizado');
       };
       sheetsSignIn();
@@ -340,7 +350,7 @@ function renderDashboard() {
       '</tr>';
     }).join('');
     dc.innerHTML = '<div class="table-wrap"><table>' +
-      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th><th>Restante</th><th>Estado</th><th>Pago</th></tr></thead>' +
+      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th><th style="text-align:right">Restante</th><th style="text-align:center">Estado</th><th>Pago</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div>';
   }
 
