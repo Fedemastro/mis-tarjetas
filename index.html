@@ -174,9 +174,6 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
     <button onclick="nav(this,'historico')">☰ Histórico</button>
     <button onclick="nav(this,'gastos')">$ Gastos extra</button>
     <button onclick="nav(this,'reportes')">📊 Reportes</button>
-    <button onclick="nav(this,'tarjetas')">▣ Tarjetas</button>
-    <button onclick="nav(this,'extensiones')">◈ Extensiones</button>
-    <button onclick="nav(this,'categorias')">◉ Categorías</button>
     <button onclick="nav(this,'config')">⚙ Config</button>
   </nav>
 
@@ -268,53 +265,6 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
         <button class="btn primary" onclick="saveManual()">Guardar resumen</button>
       </div>
     </div>
-
-    <!-- TARJETAS -->
-    <div class="section" id="s-tarjetas">
-      <div class="ph"><div class="pt">Mis tarjetas</div></div>
-      <div class="vc" id="card-form-section">
-        <div class="vct" id="card-form-title">Nueva tarjeta</div>
-        <div class="form-row">
-          <div class="form-col"><label>Nombre</label><input id="tc-name" placeholder="VISA Galicia"></div>
-          <div class="form-col"><label>Banco</label><input id="tc-bank" placeholder="Galicia"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-col"><label>Tipo</label><select id="tc-type"><option value="VISA">VISA</option><option value="Mastercard">Mastercard</option><option value="American Express">American Express</option><option value="Naranja">Naranja</option><option value="Otro">Otro</option></select></div>
-          <div class="form-col"><label>Débito automático mínimo</label><select id="tc-auto"><option value="no">No</option><option value="yes">Sí</option></select></div>
-        </div>
-        <input type="hidden" id="tc-edit-id">
-        <div style="display:flex;gap:8px">
-          <button class="btn primary" id="card-save-btn" onclick="saveCard()">Agregar tarjeta</button>
-          <button class="btn" id="card-cancel-btn" onclick="cancelEditCard()" style="display:none">Cancelar</button>
-        </div>
-      </div>
-      <div class="vc">
-        <div class="vct" style="margin-bottom:12px">Listado</div>
-        <input type="text" id="cards-filter" placeholder="Filtrar por banco o nombre..." oninput="renderCards()" style="max-width:280px;margin-bottom:14px">
-        <div id="cards-list"><div class="empty">Sin tarjetas</div></div>
-      </div>
-    </div>
-
-    <!-- EXTENSIONES -->
-    <div class="section" id="s-extensiones">
-      <div class="ph"><div class="pt">Extensiones</div></div>
-      <div class="vc">
-        <div class="vct">Titulares de extensiones</div>
-        <div class="vcs">Registrá a quiénes les diste extensiones de tus tarjetas.</div>
-        <div class="form-row"><div class="form-col"><label>Nombre</label><input id="ext-name" placeholder="Martín"></div></div>
-        <button class="btn primary" onclick="addExtHolder()">Agregar titular</button>
-        <hr>
-        <div id="ext-holders-list"><div class="empty">Sin titulares</div></div>
-      </div>
-      <div class="vc">
-        <div class="vct">Resumen por titular</div>
-        <div class="form-row" style="margin-bottom:12px">
-          <div class="form-col" style="max-width:200px"><label>Mes</label><input type="month" id="ext-filter-month" onchange="renderExtSummary()"></div>
-        </div>
-        <div id="ext-summary"><div class="empty">Seleccioná un mes</div></div>
-      </div>
-    </div>
-
     <!-- GASTOS EXTRA -->
     <div class="section" id="s-gastos">
       <div class="ph"><div class="pt">Gastos extra</div></div>
@@ -375,26 +325,6 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
         </div>
       </div>
     </div>
-
-    <!-- CATEGORIAS -->
-    <div class="section" id="s-categorias">
-      <div class="ph"><div class="pt">Categorías</div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
-        <div class="vc">
-          <div class="vct">Gestionar categorías</div>
-          <div class="form-row"><div class="form-col"><label>Nueva categoría</label><input id="cat-new" placeholder="Educación"></div></div>
-          <button class="btn primary" onclick="addCategory()">Agregar</button>
-          <hr>
-          <div id="cats-list"></div>
-        </div>
-        <div class="vc">
-          <div class="vct">Gastos por categoría</div>
-          <input type="month" id="cat-month-filter" onchange="renderCatSummary()" style="width:160px;margin-bottom:14px">
-          <div id="cat-summary"><div class="empty">Seleccioná un mes</div></div>
-        </div>
-      </div>
-    </div>
-
     <!-- HISTORICO -->
     <div class="section" id="s-historico">
       <div class="ph"><div class="pt">Histórico de resúmenes</div></div>
@@ -467,33 +397,82 @@ hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
     <!-- CONFIG -->
     <div class="section" id="s-config">
       <div class="ph"><div class="pt">Configuración</div></div>
-      <div class="vc">
-        <div class="vct">Google Sheets</div>
-        <div id="sheets-status" class="sts ok" style="margin-bottom:14px;display:inline-block">conectado</div>
-        <div class="form-row"><div class="form-col"><label>Client ID</label><input id="cfg-client-id2" type="text"></div></div>
-        <div class="form-row">
-          <div class="form-col"><label>API Key</label><input id="cfg-api-key2" type="text"></div>
-          <div class="form-col"><label>Spreadsheet ID</label><input id="cfg-sheet-id2" type="text"></div>
+
+      <!-- Config submenu tabs -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.25rem">
+        <button class="cfg-tab active" onclick="cfgTab(this,'cfg-general')" style="padding:10px 18px;border:none;border-bottom:2px solid var(--purple);background:transparent;font-family:var(--font);font-size:13px;color:var(--purple);font-weight:500;cursor:pointer">General</button>
+        <button class="cfg-tab" onclick="cfgTab(this,'cfg-tarjetas')" style="padding:10px 18px;border:none;border-bottom:2px solid transparent;background:transparent;font-family:var(--font);font-size:13px;color:var(--text2);cursor:pointer">Tarjetas</button>
+        <button class="cfg-tab" onclick="cfgTab(this,'cfg-extensiones')" style="padding:10px 18px;border:none;border-bottom:2px solid transparent;background:transparent;font-family:var(--font);font-size:13px;color:var(--text2);cursor:pointer">Extensiones</button>
+        <button class="cfg-tab" onclick="cfgTab(this,'cfg-categorias')" style="padding:10px 18px;border:none;border-bottom:2px solid transparent;background:transparent;font-family:var(--font);font-size:13px;color:var(--text2);cursor:pointer">Categorías</button>
+      </div>
+
+      <!-- GENERAL -->
+      <div id="cfg-general">
+        <div class="vc">
+          <div class="vct">Google Sheets</div>
+          <div id="sheets-status" class="sts ok" style="margin-bottom:14px;display:inline-block">conectado</div>
+          <div class="form-row"><div class="form-col"><label>Client ID</label><input id="cfg-client-id2" type="text"></div></div>
+          <div class="form-row">
+            <div class="form-col"><label>API Key</label><input id="cfg-api-key2" type="text"></div>
+            <div class="form-col"><label>Spreadsheet ID</label><input id="cfg-sheet-id2" type="text"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <button class="btn primary" onclick="saveConfig()">Guardar config</button>
+            <button class="btn" onclick="manualSync()">↻ Sincronizar ahora</button>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-          <button class="btn primary" onclick="saveConfig()">Guardar config</button>
-          <button class="btn" onclick="manualSync()">↻ Sincronizar ahora</button>
+        <div class="vc">
+          <div class="vct">Tipo de cambio</div>
+          <div class="form-row"><div class="form-col" style="max-width:220px"><label>1 USD = $ (pesos)</label><input type="number" id="fx-rate" placeholder="1200" oninput="saveFX()"></div></div>
+          <p style="font-size:12px;color:var(--text2)">Usado para calcular equivalencias cuando hay deuda en USD.</p>
+        </div>
+        <div class="vc">
+          <div class="vct">Backup local</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn primary" onclick="exportToJSON()">Descargar JSON</button>
+            <button class="btn" onclick="document.getElementById('import-inp').click()">Importar JSON</button>
+            <button class="btn danger" onclick="clearAll()">Borrar todo</button>
+          </div>
+          <input type="file" id="import-inp" accept=".json" style="display:none" onchange="loadJSON(this)">
         </div>
       </div>
-      <div class="vc">
-        <div class="vct">Tipo de cambio</div>
-        <div class="form-row"><div class="form-col" style="max-width:220px"><label>1 USD = $ (pesos)</label><input type="number" id="fx-rate" placeholder="1200" oninput="saveFX()"></div></div>
-        <p style="font-size:12px;color:var(--text2)">Usado para calcular equivalencias cuando hay deuda en USD.</p>
-      </div>
-      <div class="vc">
-        <div class="vct">Backup local</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn primary" onclick="exportToJSON()">Descargar JSON</button>
-          <button class="btn" onclick="document.getElementById('import-inp').click()">Importar JSON</button>
-          <button class="btn danger" onclick="clearAll()">Borrar todo</button>
+    <!-- EXTENSIONES -->
+      <div id="cfg-extensiones" style="display:none">
+        <div class="vc">
+          <div class="vct">Titulares de extensiones</div>
+          <div class="vcs">Registrá a quiénes les diste extensiones de tus tarjetas.</div>
+          <div class="form-row"><div class="form-col"><label>Nombre</label><input id="ext-name" placeholder="Martín"></div></div>
+          <button class="btn primary" onclick="addExtHolder()">Agregar titular</button>
+          <hr>
+          <div id="ext-holders-list"><div class="empty">Sin titulares</div></div>
         </div>
-        <input type="file" id="import-inp" accept=".json" style="display:none" onchange="loadJSON(this)">
+        <div class="vc">
+          <div class="vct">Resumen por titular</div>
+          <div class="form-row" style="margin-bottom:12px">
+            <div class="form-col" style="max-width:200px"><label>Mes</label><input type="month" id="ext-filter-month" onchange="renderExtSummary()"></div>
+          </div>
+          <div id="ext-summary"><div class="empty">Seleccioná un mes</div></div>
+        </div>
       </div>
+
+      <!-- CATEGORIAS -->
+      <div id="cfg-categorias" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+          <div class="vc">
+            <div class="vct">Gestionar categorías</div>
+            <div class="form-row"><div class="form-col"><label>Nueva categoría</label><input id="cat-new" placeholder="Educación"></div></div>
+            <button class="btn primary" onclick="addCategory()">Agregar</button>
+            <hr>
+            <div id="cats-list"></div>
+          </div>
+          <div class="vc">
+            <div class="vct">Gastos por categoría</div>
+            <input type="month" id="cat-month-filter" onchange="renderCatSummary()" style="width:160px;margin-bottom:14px">
+            <div id="cat-summary"><div class="empty">Seleccioná un mes</div></div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
   </main>
