@@ -1244,10 +1244,12 @@ function renderHistorico() {
           '<mark style="background:#fff3cd;border-radius:2px;padding:0 2px">' + eDesc.substring(idx, idx + searchQuery.length) + '</mark>' +
           eDesc.substring(idx + searchQuery.length);
       }
-      var catSel = '<select onchange="updateExpenseCategory(\'' + sid + '\', ' + j + ', this.value)" style="font-size:11px;padding:3px 6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);max-width:160px">' +
-        db.categories.map(function(c){ return '<option' + (c === eCategory ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
-        '</select>';
-      expRows += '<tr><td>' + descHtml + cuotasTag + '</td>' +
+      var catSel = eIsCredit
+        ? '<span style="font-size:11px;color:var(--text3);font-style:italic">pago / crédito</span>'
+        : '<select onchange="updateExpenseCategory(\'' + sid + '\', ' + j + ', this.value)" style="font-size:11px;padding:3px 6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);max-width:160px">' +
+          db.categories.map(function(c){ return '<option' + (c === eCategory ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
+          '</select>';
+      expRows += '<tr style="' + (eIsCredit ? 'opacity:0.6' : '') + '"><td>' + descHtml + cuotasTag + '</td>' +
         '<td>' + catSel + '</td>' +
         '<td class="num" style="text-align:right;' + creditStyle + '">' + creditSign + currSymbol + fmt(eAmount) + '</td></tr>';
     }
@@ -1479,7 +1481,8 @@ function getAllExpenses(ms) {
   var all = [];
   ms.forEach(function(s) {
     (s.ownExpenses || []).forEach(function(e) {
-      if (!e.isCredit && !e.c) all.push(e);
+      var isCredit = !!(e.isCredit || e.cr || e.c);
+      if (!isCredit) all.push(e);
     });
   });
   return all;
@@ -1617,7 +1620,8 @@ function renderStacked() {
         var total = 0;
         ms2.forEach(function(s) {
           (s.ownExpenses||[]).forEach(function(e) {
-            if (!e.isCredit && !e.c && (e.category||e.cat||'Otros') === cat) {
+            var isCredit = !!(e.isCredit || e.cr || e.c);
+            if (!isCredit && (e.category||e.cat||'Otros') === cat) {
               total += Number(e.amount||e.a||0);
             }
           });
