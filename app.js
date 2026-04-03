@@ -852,6 +852,7 @@ async function extractWithAI() {
     '3. a siempre positivo.\n' +
     '4. cu=USD si figura en columna DOLARES, sino ARS.\n' +
     '5. Para cuotas buscar patron C.03/12: q=12, qi=3.\n' +
+    '5b. Para fechas: el formato del resumen puede ser DD Mes AA (ej: 06 Abr 26 = 2026-04-06) o DD/MM/AAAA. El dia siempre va primero. Si dice 06 Abr 26 el vencimiento es 2026-04-06, NO 2026-04-30.\n' +
     '6. cat debe ser una de: Supermercado/Restaurantes/Transporte/Servicios/Salud/Ropa/Entretenimiento/Viajes/Otros.\n' +
     '7. minimo y total son PAGO MINIMO y SALDO ACTUAL del resumen.\n' +
     '8. Extensions tienen su propia seccion con nombre del titular.\n' +
@@ -1043,14 +1044,23 @@ function renderHistorico() {
     var sid = s.id;
 
     var expRows = '';
+    var catOptions = db.categories.map(function(c){
+      return '<option>' + c + '</option>';
+    }).join('');
     for (var j = 0; j < expenses.length; j++) {
       var e = expenses[j];
       var cuotasTag = (e.cuotas && e.cuotas > 1)
         ? ' <span class="badge blue" style="font-size:10px">' + (e.cuotaActual || '?') + '/' + e.cuotas + ' cuotas</span>'
         : '';
+      var currSymbol = (e.currency === 'USD') ? 'U$S ' : '$';
+      var creditStyle = e.isCredit ? 'color:var(--green)' : '';
+      var creditSign = e.isCredit ? '-' : '';
+      var catSel = '<select onchange="updateExpenseCategory(\'' + sid + '\', ' + j + ', this.value)" style="font-size:11px;padding:3px 6px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);max-width:160px">' +
+        db.categories.map(function(c){ return '<option' + (c === (e.category||'Otros') ? ' selected' : '') + '>' + c + '</option>'; }).join('') +
+        '</select>';
       expRows += '<tr><td>' + (e.desc || '-') + cuotasTag + '</td>' +
-        '<td><span class="tag">' + (e.category || '-') + '</span></td>' +
-        '<td class="num" style="text-align:right">$' + fmt(e.amount || 0) + '</td></tr>';
+        '<td>' + catSel + '</td>' +
+        '<td class="num" style="text-align:right;' + creditStyle + '">' + creditSign + currSymbol + fmt(e.amount || 0) + '</td></tr>';
     }
 
     var extHtml = '';
@@ -1095,7 +1105,10 @@ function renderHistorico() {
       '<td class="num" style="text-align:right">$' + fmt(s.total || 0) + '</td>' +
       '<td class="num" style="text-align:right">' + (Number(s.totalUSD) > 0 ? 'U$S ' + fmt(s.totalUSD) : '-') + '</td>' +
       '<td>' + driveCell + '</td>' +
-      '<td><button class="btn danger sm" onclick="event.stopPropagation();delSummary(\'' + sid + '\')">x</button></td>' +
+      '<td style="display:flex;gap:4px">' +
+        '<button class="btn sm" onclick="event.stopPropagation();editSummary(\'' + sid + '\')">editar</button>' +
+        '<button class="btn danger sm" onclick="event.stopPropagation();delSummary(\'' + sid + '\')">x</button>' +
+      '</td>' +
     '</tr>' +
     '<tr id="det-' + sid + '" style="display:none"><td colspan="8" style="padding:0">' +
       '<div style="background:var(--surface2);padding:12px 16px;border-bottom:1px solid var(--border)">' +
@@ -1123,6 +1136,95 @@ function toggleHistoricoRow(id, tr) {
   const open = det.style.display !== 'none';
   det.style.display = open ? 'none' : 'table-row';
   if (arr) arr.textContent = open ? '▶' : '▼';
+}
+
+
+
+function updateExpenseCategory(summaryId, expenseIndex, newCategory) {
+  var s = db.summaries.find(function(x){ return x.id === summaryId; });
+  if (!s || !s.ownExpenses || !s.ownExpenses[expenseIndex]) return;
+  s.ownExpenses[expenseIndex].category = newCategory;
+  saveAndSync();
+}
+
+function editSummary(id) {
+  var s = db.summaries.find(function(x){ return x.id === id; });
+  if (!s) return;
+
+  // Remove any existing edit panel
+  var existing = document.getElementById('edit-panel-' + id);
+  if (existing) { existing.remove(); return; }
+
+  var card = db.cards.find(function(c){ return c.id === s.cardId; }) || { name: s.cardName || '' };
+  var cardOpts = db.cards.map(function(c){
+    return '<option value="' + c.id + '"' + (c.id === s.cardId ? ' selected' : '') + '>' + c.name + '</option>';
+  }).join('');
+
+  var panel = document.createElement('tr');
+  panel.id = 'edit-panel-' + id;
+  panel.innerHTML = '<td colspan="8" style="padding:0">' +
+    '<div style="background:var(--purple-light);padding:16px;border-bottom:1px solid var(--border)">' +
+      '<div style="font-size:12px;font-weight:600;color:var(--purple);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Editar resumen</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">' +
+        '<div style="display:flex;flex-direction:column;gap:4px;min-width:160px">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.4px">Tarjeta</label>' +
+          '<select id="ep-card-' + id + '" style="font-size:13px;padding:7px 10px">' + cardOpts + '</select>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px;min-width:130px">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.4px">Mes</label>' +
+          '<input type="month" id="ep-month-' + id + '" value="' + (s.month || '') + '" style="font-size:13px;padding:7px 10px">' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px;min-width:130px">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.4px">Vencimiento</label>' +
+          '<input type="date" id="ep-venc-' + id + '" value="' + (s.vencimiento || '') + '" style="font-size:13px;padding:7px 10px">' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px;min-width:120px">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.4px">Total $</label>' +
+          '<input type="number" id="ep-total-' + id + '" value="' + (s.total || 0) + '" style="font-size:13px;padding:7px 10px">' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px;min-width:110px">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.4px">Mínimo $</label>' +
+          '<input type="number" id="ep-min-' + id + '" value="' + (s.minimo || 0) + '" style="font-size:13px;padding:7px 10px">' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px;min-width:100px">' +
+          '<label style="font-size:11px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.4px">Total U$S</label>' +
+          '<input type="number" id="ep-usd-' + id + '" value="' + (s.totalUSD || 0) + '" style="font-size:13px;padding:7px 10px">' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn primary" onclick="saveSummaryEdit(\'' + id + '\')">Guardar</button>' +
+        '<button class="btn" onclick="document.getElementById(\'' + 'edit-panel-' + id + '\').remove()">Cancelar</button>' +
+      '</div>' +
+    '</div>' +
+  '</td>';
+
+  // Insert after the main row
+  var mainRow = document.querySelector('[onclick*="toggleHistoricoRow(\'' + id + '\'"]');
+  if (mainRow && mainRow.parentNode) {
+    mainRow.parentNode.insertBefore(panel, mainRow.nextSibling);
+  }
+}
+
+function saveSummaryEdit(id) {
+  var s = db.summaries.find(function(x){ return x.id === id; });
+  if (!s) return;
+
+  var cardId = document.getElementById('ep-card-' + id).value;
+  var card = db.cards.find(function(c){ return c.id === cardId; });
+
+  s.cardId   = cardId;
+  s.cardName = card ? card.name : s.cardName;
+  s.month      = document.getElementById('ep-month-' + id).value;
+  s.vencimiento = document.getElementById('ep-venc-' + id).value;
+  s.total    = Number(document.getElementById('ep-total-' + id).value) || 0;
+  s.minimo   = Number(document.getElementById('ep-min-' + id).value) || 0;
+  s.totalUSD = Number(document.getElementById('ep-usd-' + id).value) || 0;
+
+  saveAndSync();
+  var panel = document.getElementById('edit-panel-' + id);
+  if (panel) panel.remove();
+  renderHistorico();
+  renderDashboard();
 }
 
 function delSummary(id) {
