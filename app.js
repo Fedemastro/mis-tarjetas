@@ -311,7 +311,7 @@ function renderDashboard() {
       '</tr>';
     }).join('');
     dc.innerHTML = '<div class="table-wrap"><table>' +
-      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th>Restante<th>Estado</th><th>Pago</th></tr></thead>' +
+      '<thead><tr><th style="width:52px"></th><th>Tarjeta</th><th>Vencimiento</th><th style="text-align:right">Total</th><th style="text-align:right">Mínimo</th><th>Estado</th><th>Pago</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div>';
   }
 
