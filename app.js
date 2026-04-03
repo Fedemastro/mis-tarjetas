@@ -1131,9 +1131,11 @@ function populateHistoricoFilters() {
 }
 
 function renderHistorico() {
-  var cardFilter = (document.getElementById('hf-card') || {}).value || '';
-  var fromFilter = (document.getElementById('hf-from') || {}).value || '';
-  var toFilter   = (document.getElementById('hf-to')   || {}).value || '';
+  var cardFilter  = (document.getElementById('hf-card')   || {}).value || '';
+  var fromFilter  = (document.getElementById('hf-from')   || {}).value || '';
+  var toFilter    = (document.getElementById('hf-to')     || {}).value || '';
+  var searchQuery = ((document.getElementById('hf-search') || {}).value || '').toLowerCase().trim();
+
   var items = db.summaries.slice().sort(function(a, b) {
     var da = a.uploadedAt || a.id || '';
     var db2 = b.uploadedAt || b.id || '';
@@ -1142,6 +1144,36 @@ function renderHistorico() {
   if (cardFilter) items = items.filter(function(s){ return s.cardId === cardFilter; });
   if (fromFilter) items = items.filter(function(s){ return s.month >= fromFilter; });
   if (toFilter)   items = items.filter(function(s){ return s.month <= toFilter; });
+  if (searchQuery) {
+    items = items.filter(function(s) {
+      // Search in ownExpenses descriptions
+      var found = (s.ownExpenses || []).some(function(e) {
+        return (e.desc || e.d || '').toLowerCase().indexOf(searchQuery) !== -1;
+      });
+      // Also search in extensions items
+      if (!found) {
+        found = (s.extensions || []).some(function(ext) {
+          return (ext.items || []).some(function(i) {
+            return (i.desc || i.d || '').toLowerCase().indexOf(searchQuery) !== -1;
+          });
+        });
+      }
+      // Also search in card name
+      if (!found) found = (s.cardName || '').toLowerCase().indexOf(searchQuery) !== -1;
+      return found;
+    });
+    // Auto-expand matching rows and highlight
+    setTimeout(function() {
+      items.forEach(function(s) {
+        var det = document.getElementById('det-' + s.id);
+        var arr = document.getElementById('arr-' + s.id);
+        if (det && det.style.display === 'none') {
+          det.style.display = 'table-row';
+          if (arr) arr.textContent = '▼';
+        }
+      });
+    }, 50);
+  }
   var el = document.getElementById('historico-list');
   if (!items.length) { el.innerHTML = '<div class="empty">Sin resumenes</div>'; return; }
 
